@@ -1,6 +1,7 @@
 use std::ops::{Index, IndexMut};
 use super::rand::XorShift;
 
+#[derive(Clone)]
 pub struct Tensor {
     pub data: Vec<f32>, //uses a 1D vector to handle any dimension
     pub shape: Vec<usize>,
@@ -8,12 +9,6 @@ pub struct Tensor {
 }
 
 impl Tensor {
-    pub fn new(data: Vec<f32>, shape: Vec<usize>) -> Self {
-        let stride = Self::shape_to_stride(&shape);
-
-        Self { data, shape, stride }
-    }
-
     fn shape_to_stride(shape: &[usize]) -> Vec<usize> {
         let mut strides = Vec::with_capacity(shape.len());
         let mut cur_stride = 1;
@@ -26,6 +21,13 @@ impl Tensor {
         strides.reverse();
         strides
     }
+
+    pub fn new(data: Vec<f32>, shape: Vec<usize>) -> Self {
+        let stride = Self::shape_to_stride(&shape);
+
+        Self { data, shape, stride }
+    }
+
 
     pub fn zeros(shape: &[usize]) -> Self {
         let total_elements = shape.iter().product();
