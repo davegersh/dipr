@@ -1,7 +1,7 @@
 use std::ops::{Index, IndexMut};
 use super::rand::XorShift;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Tensor {
     pub data: Vec<f32>, //uses a 1D vector to handle any dimension
     pub shape: Vec<usize>,
