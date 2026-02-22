@@ -6,6 +6,7 @@ pub struct Tensor {
     pub data: Vec<f32>, //uses a 1D vector to handle any dimension
     pub shape: Vec<usize>,
     pub stride: Vec<usize>,
+    pub rank: usize
 }
 
 impl Tensor {
@@ -24,8 +25,9 @@ impl Tensor {
 
     pub fn new(data: Vec<f32>, shape: Vec<usize>) -> Self {
         let stride = Self::shape_to_stride(&shape);
+        let rank = shape.len();
 
-        Self { data, shape, stride }
+        Self { data, shape, stride, rank }
     }
 
 

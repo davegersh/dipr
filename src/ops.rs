@@ -118,28 +118,32 @@ impl PartialEq for Tensor {
 }
 
 impl Tensor {
-    fn matmul(a: &Tensor, b: &Tensor) -> Tensor {
-        assert_eq!(b.shape.len(), a.shape.len(), "matmul not possible with shapes of different dims");
+    pub fn matmul(&self, other: &Tensor) -> Tensor {
+        assert_eq!(self.rank, other.rank, "Matrix Multiplication only possible with Tensors of equal rank.");
 
-        let dims = a.shape.len();
-
-        if dims > 2 {
+        if self.rank > 2 {
             todo!("Add support for batched matmul! This only works properly with 2D tensors!");
         }
 
-        assert_eq!(a.shape[dims-1], b.shape[dims-2], "Invalid shapes for matmul! Number of columns in 'a' != number of columns in 'b'!");
+        let rank = self.rank;
 
-        let mut new_shape = a.shape.clone();
-        new_shape[dims-1] = b.shape[dims-1];
+        let m = self.shape[rank-2];
+        let n = other.shape[rank-1];
+        let k = self.shape[rank-1];
+
+        assert_eq!(k, other.shape[rank-2], "Invalid shapes for matmul! Number of columns in 'a' != number of columns in 'b'!");
+
+        let mut new_shape = self.shape.clone();
+        new_shape[rank-1] = n;
 
         let mut new = Tensor::zeros(&new_shape);
 
-        for i in 0..new_shape[dims-2] {
-            for j in 0..new_shape[dims-1] {
+        for i in 0..m {
+            for j in 0..n {
                 let mut dot = 0.0;
 
-                for k in 0..a.shape[dims-1] {
-                    dot += a[&[i, k]] * b[&[k, j]];
+                for k in 0..k {
+                    dot += self[&[i, k]] * other[&[k, j]];
                 }
 
                 new[&[i, j]] = dot; //dot product of row i in A and column j in B
@@ -147,6 +151,26 @@ impl Tensor {
         }
 
         new
+    }
+
+    pub fn permute(&self, perm: &[usize]) -> Tensor {
+        let mut new = self.clone();
+
+        for (i, p) in perm.iter().zip(0..self.rank) {
+            new.shape[*i] = self.shape[p];
+            new.stride[*i] = self.stride[p]
+        }
+
+        new
+    }
+
+    pub fn transpose(&self) -> Tensor {
+        let mut perm: Vec<usize> = (0..self.rank).collect();
+
+        // swap last two shapes and strides for matrix transposition
+        perm.swap(0, 1);
+
+        self.permute(&perm)
     }
 }
 
@@ -164,6 +188,12 @@ mod tests {
         let expected = Tensor::new(vec![8., 34., 4., -1., -8., -13.], vec![2,3]);
 
         assert_eq!(m, expected);
+    }
+
+    #[test]
+    fn transpose_test() {
+        let t1 = Tensor::new(vec![1.,2.,3.,4.,5.,6.], vec![2,3]);
+        assert_eq!(t1.permute(&[1,0]), t1.transpose());
     }
 
     #[test]
