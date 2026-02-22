@@ -49,7 +49,7 @@ macro_rules! element_op {
             }
         }
 
-        // += f32
+        // += &f32
         impl $assign_trait<&f32> for Tensor {
             fn $assign_func(&mut self, rhs: &f32) {
                 for a in self.data.iter_mut() {
@@ -58,7 +58,7 @@ macro_rules! element_op {
             }
         }
 
-        // Owned + f32
+        // Owned + &f32
         impl $op_trait<&f32> for Tensor {
             type Output = Tensor;
             fn $op_func(mut self, rhs: &f32) -> Self::Output {
@@ -67,10 +67,36 @@ macro_rules! element_op {
             }
         }
 
-        // Owned + f32
+        // Ref + &f32
         impl $op_trait<&f32> for &Tensor {
             type Output = Tensor;
             fn $op_func(self, rhs: &f32) -> Self::Output {
+                self.clone() $op rhs
+            }
+        }
+
+        // += &f32
+        impl $assign_trait<f32> for Tensor {
+            fn $assign_func(&mut self, rhs: f32) {
+                for a in self.data.iter_mut() {
+                    *a $assign_op rhs
+                }
+            }
+        }
+
+        // Owned + &f32
+        impl $op_trait<f32> for Tensor {
+            type Output = Tensor;
+            fn $op_func(mut self, rhs: f32) -> Self::Output {
+                self $assign_op rhs;
+                self
+            }
+        }
+
+        // Ref + &f32
+        impl $op_trait<f32> for &Tensor {
+            type Output = Tensor;
+            fn $op_func(self, rhs: f32) -> Self::Output {
                 self.clone() $op rhs
             }
         }
@@ -198,20 +224,61 @@ mod tests {
 
     #[test]
     fn add_test() {
-        let t1 = Tensor::new(vec![1.,2.,3.,4.,5.,6.], vec![2,3]);
+        let mut t1 = Tensor::new(vec![1.,2.,3.,4.,5.,6.], vec![2,3]);
         let t2 = Tensor::new(vec![-1.,-2.,-3.,-4.,-5.,-6.], vec![2,3]);
-        let c = t1 + t2;
 
-        assert_eq!(c.data, vec![0f32; 6]);
+        t1 += &t2;
+
+        assert_eq!(t1, Tensor::zeros(&[2,3]));
+
+        t1 += 1.;
+
+        assert_eq!(t1, Tensor::ones(&[2,3]));
     }
 
     #[test]
     fn sub_test() {
-        let t1 = Tensor::new(vec![1.,2.,3.,4.,5.,6.], vec![2,3]);
+        let mut t1 = Tensor::new(vec![1.,2.,3.,4.,5.,6.], vec![2,3]);
         let t2 = Tensor::new(vec![1.,2.,3.,4.,5.,6.], vec![2,3]);
-        let c = &t1 - &t2;
 
-        assert_eq!(c.data, vec![0f32; 6]);
+        t1 -= &t2;
+
+        assert_eq!(t1, Tensor::zeros(&[2,3]));
+
+        t1 -= 1.;
+
+        assert_eq!(t1, Tensor::fill(&[2,3], -1.));
     }
+
+    #[test]
+    fn mul_test() {
+        let mut t1 = Tensor::ones(&[2,3]);
+        let t2 = Tensor::fill(&[2,3], 2.);
+
+        t1 *= &t2;
+
+        assert_eq!(t1, Tensor::fill(&[2,3], 2.));
+
+        t1 *= 0.;
+
+        assert_eq!(t1, Tensor::zeros(&[2,3]));
+    }
+
+    #[test]
+    fn div_test() {
+        let mut t1 = Tensor::new(vec![1.,2.,3.,4.,5.,6.], vec![2,3]);
+        let t2 = Tensor::new(vec![1.,2.,3.,4.,5.,6.], vec![2,3]);
+
+        t1 /= &t2;
+
+        assert_eq!(t1, Tensor::ones(&[2,3]));
+
+        t1 /= 2.;
+
+        assert_eq!(t1, Tensor::fill(&[2,3], 0.5));
+    }
+
+
+
 
 }

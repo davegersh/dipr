@@ -30,12 +30,19 @@ impl Tensor {
         Self { data, shape, stride, rank }
     }
 
-
-    pub fn zeros(shape: &[usize]) -> Self {
+    pub fn fill(shape: &[usize], fill_value: f32) -> Self {
         let total_elements = shape.iter().product();
-        let data = vec![0.0; total_elements];
+        let data = vec![fill_value; total_elements];
 
         Self::new(data, shape.to_vec())
+    }
+
+    pub fn zeros(shape: &[usize]) -> Self {
+        Self::fill(shape, 0.)
+    }
+
+    pub fn ones(shape: &[usize]) -> Self {
+        Self::fill(shape, 1.)
     }
 
     pub fn rand(shape: &[usize], seed: u32) -> Self {
@@ -78,9 +85,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn zeros_test() {
-        let t = Tensor::zeros(&[2, 3]);
-        assert_eq!(t.data, vec![0., 0., 0., 0., 0., 0.]);
+    fn fill_test() {
+        let t = Tensor::fill(&[2, 3], 42.);
+        assert_eq!(t.data, vec![42., 42., 42., 42., 42., 42.]);
     }
 
     #[test]
