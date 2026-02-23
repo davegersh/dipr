@@ -1,10 +1,10 @@
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use super::tensor::Tensor;
 
-// Handles implementation of any element wise operation (including scalar)
+// Macro for overloading operators for element-wise ops (including scalar)
 macro_rules! element_op {
     ($assign_trait:ident, $assign_func:ident, $assign_op:tt, $op_trait:ident, $op_func:ident, $op:tt) => {
-        // Assignment
+        // Owned += Ref
         impl $assign_trait<&Tensor> for Tensor {
             fn $assign_func(&mut self, rhs: &Tensor) {
                 for (a, b) in self.data.iter_mut().zip(rhs.data.iter()) {
@@ -49,7 +49,7 @@ macro_rules! element_op {
             }
         }
 
-        // += &f32
+        // Owned += &f32
         impl $assign_trait<&f32> for Tensor {
             fn $assign_func(&mut self, rhs: &f32) {
                 for a in self.data.iter_mut() {
@@ -75,7 +75,7 @@ macro_rules! element_op {
             }
         }
 
-        // += &f32
+        // Owned += f32
         impl $assign_trait<f32> for Tensor {
             fn $assign_func(&mut self, rhs: f32) {
                 for a in self.data.iter_mut() {
@@ -84,7 +84,7 @@ macro_rules! element_op {
             }
         }
 
-        // Owned + &f32
+        // Owned + f32
         impl $op_trait<f32> for Tensor {
             type Output = Tensor;
             fn $op_func(mut self, rhs: f32) -> Self::Output {
@@ -93,34 +93,40 @@ macro_rules! element_op {
             }
         }
 
-        // Ref + &f32
+        // Ref + f32
         impl $op_trait<f32> for &Tensor {
             type Output = Tensor;
             fn $op_func(self, rhs: f32) -> Self::Output {
                 self.clone() $op rhs
             }
         }
+
+        // f32 + Ref
+        impl $op_trait<&Tensor> for f32 {
+            type Output = Tensor;
+            fn $op_func(self, rhs: &Tensor) -> Self::Output {
+                let mut new = rhs.clone();
+                for a in new.data.iter_mut() {
+                    *a = self $op *a;
+                }
+                new
+            }
+        }
     };
 }
 
-//
-// ---- Addition, Subtraction, Multiplication, Division -----
-//
+// Addition, Subtraction, Multiplication, Division
 element_op!(AddAssign, add_assign, +=, Add, add, +);
 element_op!(SubAssign, sub_assign, -=, Sub, sub, -);
 element_op!(MulAssign, mul_assign, *=, Mul, mul, *);
 element_op!(DivAssign, div_assign, /=, Div, div, /);
 
-//
-// ---- Negation ----
-//
+// Negation
 impl Neg for Tensor {
     type Output = Tensor;
 
     fn neg(mut self) -> Self::Output {
-        for x in self.data.iter_mut() {
-            *x = -(*x);
-        }
+        self.map_mut(|x| -x);
         self
     }
 }
@@ -197,6 +203,26 @@ impl Tensor {
         perm.swap(0, 1);
 
         self.permute(&perm)
+    }
+
+    pub fn map_mut<F>(&mut self, f: F) -> &mut Self
+    where
+        F: Fn(f32) -> f32
+    {
+        for val in self.data.iter_mut() {
+            *val = f(*val);
+        }
+
+        self
+    }
+
+    pub fn map<F>(&self, f: F) -> Tensor
+    where
+        F: Fn(f32) -> f32
+    {
+        let mut new = self.clone();
+        new.map_mut(f);
+        new
     }
 }
 
@@ -277,8 +303,4 @@ mod tests {
 
         assert_eq!(t1, Tensor::fill(&[2,3], 0.5));
     }
-
-
-
-
 }
