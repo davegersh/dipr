@@ -55,12 +55,23 @@ impl Tensor {
         Self::new(data, shape.to_vec())
     }
 
-    fn coords_to_index(&self, coords: &[usize]) -> usize {
+    pub fn coords_to_index(&self, coords: &[usize]) -> usize {
         let mut index = 0;
         for i in 0..coords.len() {
             index += coords[i] * self.stride[i];
         }
         index
+    }
+
+    pub fn flat_index_to_coords(&self, mut index: usize) -> Vec<usize> {
+        let mut coords = vec![0; self.rank];
+
+        for i in (0..self.rank).rev() {
+            coords[i] = index % self.shape[i];
+            index /= self.shape[i];
+        }
+
+        coords
     }
 }
 

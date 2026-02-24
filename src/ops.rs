@@ -1,5 +1,5 @@
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
-use super::tensor::Tensor;
+use crate::tensor::Tensor;
 
 // Macro for overloading operators for element-wise ops (including scalar)
 macro_rules! element_op {
@@ -224,6 +224,22 @@ impl Tensor {
         new.map_mut(f);
         new
     }
+
+    pub fn sum(&self, axis: usize) -> Tensor {
+        let mut new_shape = self.shape.clone();
+        new_shape[axis] = 1;
+
+        let mut new = Tensor::zeros(&new_shape);
+
+        for i in 0..self.data.len() {
+            let mut coord = self.flat_index_to_coords(i);
+            coord[axis] = 0;
+
+            new[&coord] += self.data[i];
+        }
+
+        new
+    }
 }
 
 
@@ -233,57 +249,57 @@ mod tests {
 
     #[test]
     fn matmul_test() {
-        let t1 = Tensor::new(vec![4., 2., -3., 1.], vec![2,2]);
-        let t2 = Tensor::new(vec![1., 5., 3., 2., 7., -4.,], vec![2,3]);
+        let t1 = Tensor::new(vec![4.0, 2.0, -3.0, 1.0], vec![2,2]);
+        let t2 = Tensor::new(vec![1.0, 5.0, 3.0, 2.0, 7.0, -4.0,], vec![2,3]);
 
         let m = Tensor::matmul(&t1, &t2);
-        let expected = Tensor::new(vec![8., 34., 4., -1., -8., -13.], vec![2,3]);
+        let expected = Tensor::new(vec![8.0, 34.0, 4.0, -1.0, -8.0, -13.0], vec![2,3]);
 
         assert_eq!(m, expected);
     }
 
     #[test]
     fn transpose_test() {
-        let t1 = Tensor::new(vec![1.,2.,3.,4.,5.,6.], vec![2,3]);
+        let t1 = Tensor::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![2,3]);
         assert_eq!(t1.permute(&[1,0]), t1.transpose());
     }
 
     #[test]
     fn add_test() {
-        let mut t1 = Tensor::new(vec![1.,2.,3.,4.,5.,6.], vec![2,3]);
-        let t2 = Tensor::new(vec![-1.,-2.,-3.,-4.,-5.,-6.], vec![2,3]);
+        let mut t1 = Tensor::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![2,3]);
+        let t2 = Tensor::new(vec![-1.0, -2.0, -3.0, -4.0, -5.0, -6.0], vec![2,3]);
 
         t1 += &t2;
 
         assert_eq!(t1, Tensor::zeros(&[2,3]));
 
-        t1 += 1.;
+        t1 += 1.0;
 
         assert_eq!(t1, Tensor::ones(&[2,3]));
     }
 
     #[test]
     fn sub_test() {
-        let mut t1 = Tensor::new(vec![1.,2.,3.,4.,5.,6.], vec![2,3]);
-        let t2 = Tensor::new(vec![1.,2.,3.,4.,5.,6.], vec![2,3]);
+        let mut t1 = Tensor::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![2,3]);
+        let t2 = t1.clone();
 
         t1 -= &t2;
 
         assert_eq!(t1, Tensor::zeros(&[2,3]));
 
-        t1 -= 1.;
+        t1 -= 1.0;
 
-        assert_eq!(t1, Tensor::fill(&[2,3], -1.));
+        assert_eq!(t1, Tensor::fill(&[2,3], -1.0));
     }
 
     #[test]
     fn mul_test() {
         let mut t1 = Tensor::ones(&[2,3]);
-        let t2 = Tensor::fill(&[2,3], 2.);
+        let t2 = Tensor::fill(&[2,3], 2.0);
 
         t1 *= &t2;
 
-        assert_eq!(t1, Tensor::fill(&[2,3], 2.));
+        assert_eq!(t1, Tensor::fill(&[2,3], 2.0));
 
         t1 *= 0.;
 
@@ -292,15 +308,23 @@ mod tests {
 
     #[test]
     fn div_test() {
-        let mut t1 = Tensor::new(vec![1.,2.,3.,4.,5.,6.], vec![2,3]);
-        let t2 = Tensor::new(vec![1.,2.,3.,4.,5.,6.], vec![2,3]);
+        let mut t1 = Tensor::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![2,3]);
+        let t2 = t1.clone();
 
         t1 /= &t2;
 
         assert_eq!(t1, Tensor::ones(&[2,3]));
 
-        t1 /= 2.;
+        t1 /= 2.0;
 
         assert_eq!(t1, Tensor::fill(&[2,3], 0.5));
+    }
+
+    #[test]
+    fn sum_test() {
+        let t1 = Tensor::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0,], vec![3,2]);
+
+        assert_eq!(t1.sum(0), Tensor::new(vec![9.0, 12.0], vec![1,2]));
+        assert_eq!(t1.sum(1), Tensor::new(vec![3.0, 7.0, 11.0,], vec![3,1]));
     }
 }
