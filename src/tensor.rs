@@ -73,6 +73,10 @@ impl Tensor {
 
         coords
     }
+
+    pub fn zero(&mut self) {
+        self.data = vec![0.0; self.data.len()]
+    }
 }
 
 impl Index<&[usize]> for Tensor {
