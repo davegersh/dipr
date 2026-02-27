@@ -1,9 +1,3 @@
-// what does a model look like?
-// perhaps a list of layers right?
-// needs an optimizer to optimizer things
-// Kind of like a layer though? It has forward() it has backward() it has parameters to update!
-//
-
 use crate::Tensor;
 use crate::layer::Layer;
 use crate::loss::Loss;
@@ -28,32 +22,31 @@ impl Model {
         self.layers.push(Box::new(layer));
     }
 
-    pub fn train(&mut self, x_train: &Tensor, y_train: &Tensor, epochs: usize) {
+    pub fn train(&mut self, x_train: &Tensor, y_train: &Tensor, epochs: usize) -> Vec<f32> {
+        let mut cost_history = vec![];
+
         for _ in 0..epochs {
             // forward propagation
             let y_pred = self.forward_train(x_train);
 
             // calculate cost
             let cost = self.loss.compute(y_train, &y_pred);
-
-            // println!("y_pred: {:?}", y_pred);
+            cost_history.push(cost[&[0, 0]]);
 
             //backprop
             let dj_dy = self.loss.compute_derivative(y_train, &y_pred);
-            // println!("dj_dy: {:?}", dj_dy);
             self.backward(&dj_dy);
 
             // update parameters
             self.update_parameters();
-
-            println! {"Cost: {:?}", cost[&[0,0]]};
         }
+
+        cost_history
     }
 
     pub fn update_parameters(&mut self) {
         for layer in self.layers.iter_mut() {
             for (param, grad) in layer.parameters_mut() {
-                // println!("Param: {:?}, grad: {:?}", param.data[0], grad.data);
                 self.optimizer.update_parameter(param, grad);
             }
         }
@@ -86,10 +79,18 @@ impl Layer for Model {
     }
 
     fn parameters_mut(&mut self) -> Vec<(&mut Tensor, &Tensor)> {
-        todo!()
+        let mut params = vec![];
+
+        for layer in self.layers.iter_mut() {
+            params.extend(layer.parameters_mut());
+        }
+
+        params
     }
 
     fn zero_grad(&mut self) {
-        todo!()
+        for layer in self.layers.iter_mut() {
+            layer.zero_grad();
+        }
     }
 }

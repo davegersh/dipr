@@ -13,11 +13,13 @@ pub trait Layer {
     /// Same as forward(...) with added functionality to prepare data for backward(...)
     fn forward_train(&mut self, x: &Tensor) -> Tensor;
 
-    /// gradient from next layer => gradient of this layer
+    /// Gradient from next layer => gradient of this layer
     fn backward(&mut self, dj_dy: &Tensor) -> Tensor;
 
+    /// Returns a list of tuples containing the parameter and it's gradient respectively
     fn parameters_mut(&mut self) -> Vec<(&mut Tensor, &Tensor)>;
 
+    /// Resets the Layer's gradients to zero
     fn zero_grad(&mut self);
 }
 
