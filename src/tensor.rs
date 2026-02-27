@@ -1,12 +1,12 @@
-use std::ops::{Index, IndexMut};
 use super::rand::XorShift;
+use std::ops::{Index, IndexMut};
 
 #[derive(Clone, Debug)]
 pub struct Tensor {
     pub data: Vec<f32>, //uses a 1D vector to handle any dimension
     pub shape: Vec<usize>,
     pub stride: Vec<usize>,
-    pub rank: usize
+    pub rank: usize,
 }
 
 impl Tensor {
@@ -27,7 +27,12 @@ impl Tensor {
         let stride = Self::shape_to_stride(&shape);
         let rank = shape.len();
 
-        Self { data, shape, stride, rank }
+        Self {
+            data,
+            shape,
+            stride,
+            rank,
+        }
     }
 
     pub fn fill(shape: &[usize], fill_value: f32) -> Self {
@@ -75,7 +80,7 @@ impl Tensor {
     }
 
     pub fn zero(&mut self) {
-        self.data = vec![0.0; self.data.len()]
+        self.map_mut(|_| 0.0);
     }
 }
 
@@ -131,7 +136,7 @@ mod tests {
 
     #[test]
     fn index_test() {
-        let t = Tensor::new(vec![1.,2.,3.,4.,5.,6.], vec![2,3]);
+        let t = Tensor::new(vec![1., 2., 3., 4., 5., 6.], vec![2, 3]);
         assert_eq!(t[&[1, 1]], t.data[4])
     }
 }

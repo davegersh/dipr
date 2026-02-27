@@ -5,26 +5,29 @@ use crate::tensor::Tensor;
 // j => cost function
 // dj_dy => partial derivative of j (cost) with respect to y (layer output)
 
+/// Base trait for all layers in a model
 pub trait Layer {
-    // performs the forward pass for this layer
+    /// Input tensor (x) => output tensor (y)
     fn forward(&mut self, x: &Tensor) -> Tensor;
+
+    /// Same as forward(...) with added functionality to prepare data for backward(...)
     fn forward_train(&mut self, x: &Tensor) -> Tensor;
 
+    /// gradient from next layer => gradient of this layer
     fn backward(&mut self, dj_dy: &Tensor) -> Tensor;
-}
 
-pub trait Trainable {
     fn parameters_mut(&mut self) -> Vec<(&mut Tensor, &Tensor)>;
+
     fn zero_grad(&mut self);
 }
 
 pub struct Dense {
-    weights: Tensor,
+    pub weights: Tensor,
     bias: Tensor,
 
     x_cache: Option<Tensor>,
     weights_grad: Tensor,
-    bias_grad: Tensor
+    bias_grad: Tensor,
 }
 
 impl Dense {
@@ -49,7 +52,8 @@ impl Dense {
 
 impl Layer for Dense {
     fn forward(&mut self, x: &Tensor) -> Tensor {
-        self.weights.matmul(x) + &self.bias //y = wx + b
+        // println!("Weights: {:?}", self.weights);
+        x.matmul(&self.weights.transpose()) + &self.bias //y = wx + b
     }
 
     fn forward_train(&mut self, x: &Tensor) -> Tensor {
@@ -58,19 +62,21 @@ impl Layer for Dense {
     }
 
     fn backward(&mut self, dj_dy: &Tensor) -> Tensor {
+        self.zero_grad();
+
         if let Some(x) = &self.x_cache {
-            self.weights_grad = x.transpose().matmul(dj_dy); // dj/dw = dj/dY * dy/dw
+            // println!("dj_dy: {:?}, x: {:?}", dj_dy.shape, x.shape);
+            self.weights_grad = dj_dy.transpose().matmul(&x); // dj/dw = dj/dY * dy/dw
             self.bias_grad = dj_dy.sum(0); // dj/db = dj/dy * dy/db = dj/dy * 1
 
             // dj/dX = dj/dY * dY/dX = dj/dY * w
-            return dj_dy.matmul(&self.weights.transpose())
+            // println!("weights: {:?}", self.weights.shape);
+            return dj_dy.matmul(&self.weights);
         }
 
         panic!("Input not cached when calculating gradient for Dense Layer!");
     }
-}
 
-impl Trainable for Dense {
     fn parameters_mut(&mut self) -> Vec<(&mut Tensor, &Tensor)> {
         vec![
             (&mut self.weights, &self.weights_grad),
@@ -79,14 +85,19 @@ impl Trainable for Dense {
     }
 
     fn zero_grad(&mut self) {
-        self.weights.zero();
-        self.bias.zero();
+        self.weights_grad.zero();
+        self.bias_grad.zero();
     }
 }
 
-
 pub struct ReLU {
-    x_cache: Option<Tensor>
+    x_cache: Option<Tensor>,
+}
+
+impl ReLU {
+    pub fn new() -> Self {
+        Self { x_cache: None }
+    }
 }
 
 impl Layer for ReLU {
@@ -101,13 +112,7 @@ impl Layer for ReLU {
 
     fn backward(&mut self, dj_dy: &Tensor) -> Tensor {
         if let Some(x) = &self.x_cache {
-            let dy_dx = x.map(|i| {
-                if i > 0.0 {
-                    i
-                } else {
-                    0.0
-                }
-            });
+            let dy_dx = x.map(|i| if i > 0.0 { i } else { 0.0 });
 
             // chain rule!
             let dj_dx = dj_dy * dy_dx;
@@ -117,21 +122,31 @@ impl Layer for ReLU {
         panic!("Input not cached when calculating gradient for ReLU Layer!");
     }
 
+    fn parameters_mut(&mut self) -> Vec<(&mut Tensor, &Tensor)> {
+        vec![]
+    }
 
+    fn zero_grad(&mut self) {}
 }
 
-
 pub struct Sigmoid {
-    y_cache: Option<Tensor>
+    y_cache: Option<Tensor>,
+}
+
+impl Sigmoid {
+    pub fn new() -> Self {
+        Self { y_cache: None }
+    }
 }
 
 impl Layer for Sigmoid {
     fn forward(&mut self, x: &Tensor) -> Tensor {
-        x.map(|i| 1.0 / (1.0 - (-i).exp())) // y = sigmoid(x)
+        x.map(|i| 1.0 / (1.0 + (-i).exp())) // y = sigmoid(x)
     }
 
     fn forward_train(&mut self, x: &Tensor) -> Tensor {
         let y = self.forward(x);
+        // println!("Sigmoid Input: {:?}, Output: {:?}", x, y);
 
         self.y_cache = Some(y.clone());
         y
@@ -147,4 +162,9 @@ impl Layer for Sigmoid {
         panic!("Output not cached when calculating gradient for Sigmoid layer!");
     }
 
+    fn parameters_mut(&mut self) -> Vec<(&mut Tensor, &Tensor)> {
+        vec![]
+    }
+
+    fn zero_grad(&mut self) {}
 }
