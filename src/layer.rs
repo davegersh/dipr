@@ -54,7 +54,6 @@ impl Dense {
 
 impl Layer for Dense {
     fn forward(&mut self, x: &Tensor) -> Tensor {
-        // println!("Weights: {:?}", self.weights);
         x.matmul(&self.weights.transpose()) + &self.bias //y = wx + b
     }
 
@@ -67,12 +66,10 @@ impl Layer for Dense {
         self.zero_grad();
 
         if let Some(x) = &self.x_cache {
-            // println!("dj_dy: {:?}, x: {:?}", dj_dy.shape, x.shape);
             self.weights_grad = dj_dy.transpose().matmul(&x); // dj/dw = dj/dY * dy/dw
             self.bias_grad = dj_dy.sum(0); // dj/db = dj/dy * dy/db = dj/dy * 1
 
             // dj/dX = dj/dY * dY/dX = dj/dY * w
-            // println!("weights: {:?}", self.weights.shape);
             return dj_dy.matmul(&self.weights);
         }
 
@@ -148,7 +145,6 @@ impl Layer for Sigmoid {
 
     fn forward_train(&mut self, x: &Tensor) -> Tensor {
         let y = self.forward(x);
-        // println!("Sigmoid Input: {:?}, Output: {:?}", x, y);
 
         self.y_cache = Some(y.clone());
         y
