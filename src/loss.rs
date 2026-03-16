@@ -38,3 +38,26 @@ impl Loss for BinaryCrossEntropy {
         log_probs.sum(1) / y_truth.shape[1] as f32
     }
 }
+
+pub struct CategoricalCrossEntropy;
+
+impl CategoricalCrossEntropy {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Loss for CategoricalCrossEntropy {
+    fn compute(&self, y_truth: &Tensor, y_pred: &Tensor) -> Tensor {
+        // softmax
+        let total = y_pred.map(|x| x.exp()).sum(1);
+        println!("SHAPE: {:?}", total.shape);
+        let softmax = y_pred.map(|x| x.exp()) / total;
+
+        (softmax * y_truth).map(|x| -x.ln())
+    }
+
+    fn compute_derivative(&self, y_truth: &Tensor, y_pred: &Tensor) -> Tensor {
+        (y_pred - y_truth) / y_truth.shape[1] as f32
+    }
+}

@@ -7,8 +7,48 @@ macro_rules! element_op {
         // Owned += Ref
         impl $assign_trait<&Tensor> for Tensor {
             fn $assign_func(&mut self, rhs: &Tensor) {
-                for (a, b) in self.data.iter_mut().zip(rhs.data.iter()) {
-                    *a $assign_op b
+
+                // Easy element-wise op for tensors of exactly the same shape
+                if self.shape == rhs.shape {
+                    for (a, b) in self.data.iter_mut().zip(rhs.data.iter()) {
+                        *a $assign_op b
+                    }
+                }
+
+                // Element-wise operation with broadcasting
+                else if let Some(new_shape) = self.broadcast_shape(rhs) {
+                    let mut op_tensor = Tensor::zeros(&new_shape);
+
+                    let mn = new_shape.iter().product();
+
+                    for i in 0..mn {
+                        let coords = op_tensor.flat_index_to_coords(i);
+
+                        let mut self_index = 0;
+                        let mut rhs_index = 0;
+
+                        for k in 0..coords.len() {
+                            if self.shape[k] > 1 {
+                                self_index += coords[k] * self.stride[k];
+                            }
+
+                            if rhs.shape[k] > 1 {
+                                rhs_index += coords[k] * rhs.stride[k];
+                            }
+                        }
+
+                        op_tensor[&coords] = self.data[self_index] $op rhs.data[rhs_index];
+                    }
+
+                    *self = op_tensor;
+                }
+
+                // Can't broadcast! Panic!
+                else {
+                    panic!(
+                        "Cannot {} element-wise tensors with shapes: {:?} and {:?}! They cannot be broadcasted!",
+                        stringify!($op_func), self.shape, rhs.shape
+                    )
                 }
             }
         }
@@ -247,6 +287,43 @@ impl Tensor {
 
         new
     }
+
+    /// Returns the shape of a new tensor after ops broadcasting to another tensor (Returns None if not broadcastable)
+    pub fn broadcast_shape(&self, other: &Tensor) -> Option<Vec<usize>> {
+        if self.shape == other.shape {
+            return Some(self.shape.clone());
+        }
+
+        let max_rank = self.rank.max(other.rank);
+        let mut new_shape = Vec::with_capacity(max_rank);
+
+        for i in 0..max_rank {
+            let self_index = (i as i32) + (self.rank as i32) - (max_rank as i32);
+            let other_index = (i as i32) + (other.rank as i32) - (max_rank as i32);
+
+            if self_index < 0 {
+                new_shape.push(other.shape[i]);
+                continue;
+            } else if other_index < 0 {
+                new_shape.push(self.shape[i]);
+                continue;
+            }
+
+            let self_dim = self.shape[self_index as usize];
+            let other_dim = other.shape[other_index as usize];
+
+            if self_dim != other_dim {
+                if self_dim != 1 && other_dim != 1 {
+                    return None;
+                }
+                new_shape.push(self_dim.max(other_dim))
+            } else {
+                new_shape.push(self_dim);
+            }
+        }
+
+        Some(new_shape)
+    }
 }
 
 #[cfg(test)]
@@ -254,7 +331,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn matmul_test() {
+    fn test_matmul() {
         let t1 = Tensor::new(vec![4.0, 2.0, -3.0, 1.0], vec![2, 2]);
         let t2 = Tensor::new(vec![1.0, 5.0, 3.0, 2.0, 7.0, -4.0], vec![2, 3]);
 
@@ -265,13 +342,65 @@ mod tests {
     }
 
     #[test]
-    fn transpose_test() {
+    fn test_transpose() {
         let t1 = Tensor::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![2, 3]);
         assert_eq!(t1.permute(&[1, 0]), t1.transpose());
     }
 
     #[test]
-    fn add_test() {
+    fn test_broadcast_add() {
+        let t1 = Tensor::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![3, 2]);
+        let t2 = Tensor::new(vec![-1.0, -2.0, -3.0], vec![3, 1]);
+
+        let expected = Tensor::new(vec![0.0, 1.0, 1.0, 2.0, 2.0, 3.0], vec![3, 2]);
+
+        assert_eq!(t1 + t2, expected);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_broadcast_add_panic() {
+        let t1 = Tensor::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![3, 2]);
+        let t2 = Tensor::new(vec![-1.0, -2.0], vec![2, 1]);
+
+        let _error = t1 + t2;
+    }
+
+    #[test]
+    fn test_broadcast_shape_same_size() {
+        let t1 = Tensor::zeros(&[3, 2]);
+        let t2 = Tensor::zeros(&[3, 1]);
+        let broadcast_shape = t1.broadcast_shape(&t2);
+
+        assert_eq!(broadcast_shape, Some(vec![3, 2]));
+
+        let t1 = Tensor::zeros(&[1, 1]);
+        let t2 = Tensor::zeros(&[3, 3]);
+        let broadcast_shape = t1.broadcast_shape(&t2);
+
+        assert_eq!(broadcast_shape, Some(vec![3, 3]));
+    }
+
+    #[test]
+    fn test_broadcast_shape_diff_size() {
+        let t1 = Tensor::zeros(&[5, 1, 4]);
+        let t2 = Tensor::zeros(&[3, 1]);
+        let broadcast_shape = t1.broadcast_shape(&t2);
+
+        assert_eq!(broadcast_shape, Some(vec![5, 3, 4]));
+    }
+
+    #[test]
+    fn test_broadcast_shape_none() {
+        let t1 = Tensor::zeros(&[5, 2, 4]);
+        let t2 = Tensor::zeros(&[3, 1]);
+        let broadcast_shape = t1.broadcast_shape(&t2);
+
+        assert_eq!(broadcast_shape, None);
+    }
+
+    #[test]
+    fn test_add() {
         let mut t1 = Tensor::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![2, 3]);
         let t2 = Tensor::new(vec![-1.0, -2.0, -3.0, -4.0, -5.0, -6.0], vec![2, 3]);
 
@@ -285,7 +414,7 @@ mod tests {
     }
 
     #[test]
-    fn sub_test() {
+    fn test_sub() {
         let mut t1 = Tensor::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![2, 3]);
         let t2 = t1.clone();
 
@@ -299,7 +428,7 @@ mod tests {
     }
 
     #[test]
-    fn mul_test() {
+    fn test_mul() {
         let mut t1 = Tensor::ones(&[2, 3]);
         let t2 = Tensor::fill(&[2, 3], 2.0);
 
@@ -313,7 +442,7 @@ mod tests {
     }
 
     #[test]
-    fn div_test() {
+    fn test_div() {
         let mut t1 = Tensor::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![2, 3]);
         let t2 = t1.clone();
 
@@ -327,7 +456,7 @@ mod tests {
     }
 
     #[test]
-    fn sum_test() {
+    fn test_sum() {
         let t1 = Tensor::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![3, 2]);
 
         assert_eq!(t1.sum(0), Tensor::new(vec![9.0, 12.0], vec![1, 2]));

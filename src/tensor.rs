@@ -11,15 +11,14 @@ pub struct Tensor {
 
 impl Tensor {
     fn shape_to_stride(shape: &[usize]) -> Vec<usize> {
-        let mut strides = Vec::with_capacity(shape.len());
-        let mut cur_stride = 1;
+        let mut strides = vec![0; shape.len()];
 
-        for dim in shape.iter().rev() {
-            strides.push(cur_stride);
-            cur_stride *= dim
+        strides[shape.len() - 1] = 1;
+
+        for i in (0..shape.len() - 1).rev() {
+            strides[i] = strides[i + 1] * shape[i + 1];
         }
 
-        strides.reverse();
         strides
     }
 
@@ -105,13 +104,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn fill_test() {
+    fn test_fill() {
         let t = Tensor::fill(&[2, 3], 42.);
         assert_eq!(t.data, vec![42., 42., 42., 42., 42., 42.]);
     }
 
     #[test]
-    fn rand_test() {
+    fn test_rand() {
         let t = Tensor::rand(&[2, 3], 42);
 
         for i in 0..6 {
@@ -124,7 +123,7 @@ mod tests {
     }
 
     #[test]
-    fn shape_to_stride_test() {
+    fn test_shape_to_stride() {
         // 2D
         let stride1 = Tensor::shape_to_stride(&[2, 3]);
         assert_eq!(stride1, vec![3, 1]);
@@ -135,8 +134,11 @@ mod tests {
     }
 
     #[test]
-    fn index_test() {
-        let t = Tensor::new(vec![1., 2., 3., 4., 5., 6.], vec![2, 3]);
-        assert_eq!(t[&[1, 1]], t.data[4])
+    fn test_index() {
+        let t1 = Tensor::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![2, 3]);
+        assert_eq!(t1[&[0, 1]], 2.0);
+
+        let t2 = Tensor::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![3, 2]);
+        assert_eq!(t2[&[0, 1]], 2.0);
     }
 }

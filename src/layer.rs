@@ -54,7 +54,7 @@ impl Dense {
 
 impl Layer for Dense {
     fn forward(&mut self, x: &Tensor) -> Tensor {
-        x.matmul(&self.weights.transpose()) + &self.bias //y = wx + b
+        x.matmul(&self.weights.transpose()) + &self.bias.transpose() //y = wx + b
     }
 
     fn forward_train(&mut self, x: &Tensor) -> Tensor {

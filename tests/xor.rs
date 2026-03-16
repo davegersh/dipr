@@ -6,7 +6,7 @@ use dipr::{
 };
 
 #[test]
-fn xor_test_converge() {
+fn test_xor_converge() {
     // create dataset
     let x = Tensor::new(vec![0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0], vec![4, 2]);
     let y = Tensor::new(vec![0.0, 1.0, 1.0, 0.0], vec![4, 1]);
