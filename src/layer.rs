@@ -34,11 +34,11 @@ pub struct Dense {
 
 impl Dense {
     pub fn new(shape: &[usize]) -> Dense {
-        let weights = Tensor::rand(shape, 42);
+        let weights = Tensor::rand(shape, 42) / 100.0;
         let weights_grad = Tensor::zeros(shape);
 
         let mut bias_shape = shape.to_vec();
-        bias_shape[weights.rank - 1] = 1;
+        bias_shape[weights.rank - 2] = 1;
         let bias = Tensor::zeros(&bias_shape);
         let bias_grad = bias.clone();
 
@@ -54,7 +54,7 @@ impl Dense {
 
 impl Layer for Dense {
     fn forward(&mut self, x: &Tensor) -> Tensor {
-        x.matmul(&self.weights.transpose()) + &self.bias.transpose() //y = wx + b
+        &x.matmul(&self.weights) + &self.bias //y = wx + b
     }
 
     fn forward_train(&mut self, x: &Tensor) -> Tensor {
@@ -66,14 +66,16 @@ impl Layer for Dense {
         self.zero_grad();
 
         if let Some(x) = &self.x_cache {
-            self.weights_grad = dj_dy.transpose().matmul(&x); // dj/dw = dj/dY * dy/dw
-            self.bias_grad = dj_dy.sum(0); // dj/db = dj/dy * dy/db = dj/dy * 1
+            self.weights_grad = x.transpose().matmul(dj_dy); //dj_dy.transpose().matmul(&x); // dj/dw = dj/dY * dy/dw
+            self.bias_grad = dj_dy.sum(1); // dj/db = dj/dy * dy/db = dj/dy * 1
 
             // dj/dX = dj/dY * dY/dX = dj/dY * w
-            return dj_dy.matmul(&self.weights);
+            return dj_dy.matmul(&self.weights.transpose());
         }
 
-        panic!("Input not cached when calculating gradient for Dense Layer!");
+        panic!(
+            "Input not cached when calculating gradient for Dense Layer! Did you run the forward_train() method?"
+        );
     }
 
     fn parameters_mut(&mut self) -> Vec<(&mut Tensor, &Tensor)> {

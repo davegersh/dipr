@@ -50,14 +50,24 @@ impl CategoricalCrossEntropy {
 impl Loss for CategoricalCrossEntropy {
     fn compute(&self, y_truth: &Tensor, y_pred: &Tensor) -> Tensor {
         // softmax
-        let total = y_pred.map(|x| x.exp()).sum(1);
-        println!("SHAPE: {:?}", total.shape);
-        let softmax = y_pred.map(|x| x.exp()) / total;
+        println!("y_pred: {:?}\n", y_pred);
 
-        (softmax * y_truth).map(|x| -x.ln())
+        let exp_pred = y_pred.map(|x| (x).exp());
+        let total = exp_pred.sum(1);
+
+        let softmax = exp_pred / total;
+
+        println!("softmax: {:?}\n", softmax);
+
+        -(softmax * y_truth).map(|x| x.ln())
+
+        // // let cce = (y_truth * softmax.map(|x| -x.ln())).sum(1) / y_truth.shape[0] as f32;
+
+        // println!("CCE: {:?}", cce);
+        // cce
     }
 
     fn compute_derivative(&self, y_truth: &Tensor, y_pred: &Tensor) -> Tensor {
-        (y_pred - y_truth) / y_truth.shape[1] as f32
+        (y_pred - y_truth) / y_truth.shape[0] as f32
     }
 }

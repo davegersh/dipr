@@ -3,6 +3,7 @@ use std::io::{BufRead, BufReader};
 
 use dipr::loss::CategoricalCrossEntropy;
 use dipr::prep::OneHotEncoder;
+use dipr::rand::XorShift;
 use dipr::{
     Model, Tensor,
     layer::{Dense, Layer, ReLU, Sigmoid},
@@ -33,13 +34,19 @@ fn load_data(path: &str) -> (Vec<f32>, Vec<String>) {
         x_data.extend(f);
     }
 
+    let mut x_rand = XorShift::new(42, false);
+    let mut y_rand = XorShift::new(42, false);
+
+    x_rand.shuffle(&mut x_data);
+    y_rand.shuffle(&mut y_data);
+
     (x_data, y_data)
 }
 
 #[test]
 fn test_iris_converge() {
     // load data
-    let (x_data, y_data) = load_data("tests/iris/iris_small.data");
+    let (x_data, y_data) = load_data("tests/iris_data/iris.data");
 
     let x = Tensor::new(x_data, vec![y_data.len(), 4]);
 
@@ -57,20 +64,21 @@ fn test_iris_converge() {
 
     // create model
     let mut model = Model::new(
-        Box::new(SGD::new(0.05)),
+        Box::new(SGD::new(0.01)),
         Box::new(CategoricalCrossEntropy::new()),
     );
 
-    model.add_layer(Dense::new(&[10, 4]));
+    model.add_layer(Dense::new(&[4, 16]));
     model.add_layer(ReLU::new());
-    model.add_layer(Dense::new(&[3, 10]));
+    model.add_layer(Dense::new(&[16, 3]));
 
     // train it
-    // model.train(&x, &y, 10);
+    let history = model.train(&x, &y, 100);
+    println!("\nCost History: {:?}\n", history);
 
     // test it
-    // let final_preds = model.forward(&x);
-    // println!("Final: {:?}", final_preds);
+    let final_preds = model.forward(&x);
+    println!("Final: {:?}", final_preds);
 
-    assert_eq!(1.0, 1.0);
+    assert_eq!(1.0, 0.0);
 }

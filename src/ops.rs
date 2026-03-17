@@ -209,7 +209,9 @@ impl Tensor {
         assert_eq!(
             k,
             other.shape[rank - 2],
-            "Invalid shapes for matmul! Number of columns in 'a' != number of columns in 'b'!"
+            "Invalid shapes for matmul! Inner shapes must match: {:?} * {:?}",
+            self.shape,
+            other.shape
         );
 
         let mut new_shape = self.shape.clone();

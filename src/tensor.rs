@@ -51,7 +51,7 @@ impl Tensor {
 
     pub fn rand(shape: &[usize], seed: u32) -> Self {
         let total_elements = shape.iter().product();
-        let data = XorShift::new(seed)
+        let data = XorShift::new(seed, true)
             .take(total_elements)
             .map(|x| x as f32)
             .collect();
