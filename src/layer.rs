@@ -34,7 +34,7 @@ pub struct Dense {
 
 impl Dense {
     pub fn new(shape: &[usize]) -> Dense {
-        let weights = Tensor::rand(shape, 42) / 100.0;
+        let weights = Tensor::rand(shape, 42);
         let weights_grad = Tensor::zeros(shape);
 
         let mut bias_shape = shape.to_vec();
@@ -66,7 +66,7 @@ impl Layer for Dense {
         self.zero_grad();
 
         if let Some(x) = &self.x_cache {
-            self.weights_grad = x.transpose().matmul(dj_dy); //dj_dy.transpose().matmul(&x); // dj/dw = dj/dY * dy/dw
+            self.weights_grad = x.transpose().matmul(dj_dy); // dj/dw = dj/dY * dy/dw
             self.bias_grad = dj_dy.sum(1); // dj/db = dj/dy * dy/db = dj/dy * 1
 
             // dj/dX = dj/dY * dY/dX = dj/dY * w
@@ -93,17 +93,21 @@ impl Layer for Dense {
 
 pub struct ReLU {
     x_cache: Option<Tensor>,
+    leak: f32,
 }
 
 impl ReLU {
-    pub fn new() -> Self {
-        Self { x_cache: None }
+    pub fn new(leak: f32) -> Self {
+        Self {
+            x_cache: None,
+            leak,
+        }
     }
 }
 
 impl Layer for ReLU {
     fn forward(&mut self, x: &Tensor) -> Tensor {
-        x.map(|i| i.max(0.0)) // y = max(0, x)
+        x.map(|i| i.max(self.leak * i)) // y = max(leak * x, x)
     }
 
     fn forward_train(&mut self, x: &Tensor) -> Tensor {
@@ -113,12 +117,10 @@ impl Layer for ReLU {
 
     fn backward(&mut self, dj_dy: &Tensor) -> Tensor {
         if let Some(x) = &self.x_cache {
-            let dy_dx = x.map(|i| if i > 0.0 { i } else { 0.0 });
+            let dy_dx = x.map(|i| if i > 0.0 { 1.0 } else { self.leak });
 
             // chain rule!
-            let dj_dx = dj_dy * dy_dx;
-
-            return dj_dx;
+            return dj_dy * dy_dx;
         }
         panic!("Input not cached when calculating gradient for ReLU Layer!");
     }

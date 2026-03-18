@@ -29,13 +29,13 @@ impl Loss for BinaryCrossEntropy {
     fn compute(&self, y_truth: &Tensor, y_pred: &Tensor) -> Tensor {
         let log_loss = LogLoss {};
         let log_probs = log_loss.compute(y_truth, y_pred);
-        log_probs.sum(1) / y_truth.shape[1] as f32
+        log_probs.sum_all()
     }
 
     fn compute_derivative(&self, y_truth: &Tensor, y_pred: &Tensor) -> Tensor {
         let log_loss = LogLoss {};
         let log_probs = log_loss.compute_derivative(y_truth, y_pred);
-        log_probs.sum(1) / y_truth.shape[1] as f32
+        log_probs.sum(1) / y_truth.shape[0] as f32
     }
 }
 
@@ -49,25 +49,12 @@ impl CategoricalCrossEntropy {
 
 impl Loss for CategoricalCrossEntropy {
     fn compute(&self, y_truth: &Tensor, y_pred: &Tensor) -> Tensor {
-        // softmax
-        println!("y_pred: {:?}\n", y_pred);
-
-        let exp_pred = y_pred.map(|x| (x).exp());
-        let total = exp_pred.sum(1);
-
-        let softmax = exp_pred / total;
-
-        println!("softmax: {:?}\n", softmax);
-
-        -(softmax * y_truth).map(|x| x.ln())
-
-        // // let cce = (y_truth * softmax.map(|x| -x.ln())).sum(1) / y_truth.shape[0] as f32;
-
-        // println!("CCE: {:?}", cce);
-        // cce
+        let softmax = y_pred.softmax();
+        -(y_truth * softmax.ln()).sum_all() / y_truth.shape[0] as f32
     }
 
     fn compute_derivative(&self, y_truth: &Tensor, y_pred: &Tensor) -> Tensor {
-        (y_pred - y_truth) / y_truth.shape[0] as f32
+        let softmax = y_pred.softmax();
+        (softmax - y_truth) / y_truth.shape[0] as f32
     }
 }

@@ -31,6 +31,10 @@ impl Model {
 
             // calculate cost
             let cost = self.loss.compute(y_train, &y_pred);
+            if cost.shape.iter().any(|x| *x != 1) {
+                // panic!("Cost output is not scalar!");
+            }
+
             cost_history.push(cost[&[0, 0]]);
 
             //backprop

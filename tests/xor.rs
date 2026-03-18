@@ -13,23 +13,22 @@ fn test_xor_converge() {
 
     // create model
     let mut model = Model::new(
-        Box::new(SGD::new(0.45)),
+        Box::new(SGD::new(1.00)),
         Box::new(BinaryCrossEntropy::new()),
     );
 
-    model.add_layer(Dense::new(&[2, 3]));
-    model.add_layer(ReLU::new());
-    model.add_layer(Dense::new(&[3, 1]));
+    model.add_layer(Dense::new(&[2, 5]));
+    model.add_layer(ReLU::new(0.0));
+    model.add_layer(Dense::new(&[5, 1]));
     model.add_layer(Sigmoid::new());
 
     // train it
-    model.train(&x, &y, 50);
+    let history = model.train(&x, &y, 100);
+    println!("\nCost History: {:?}\n", history);
 
-    // test it
+    // check train convergence
     let final_preds = model.forward(&x);
     println!("Final: {:?}", final_preds);
-
-    // assert!(false);
 
     assert!(final_preds[&[0, 0]] < 0.05);
     assert!(final_preds[&[1, 0]] > 0.95);

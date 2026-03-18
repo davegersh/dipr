@@ -3,15 +3,15 @@ use std::u32;
 pub struct XorShift {
     pub seed: u32,
     pub state: u32,
-    pub normalized: bool,
+    pub scaled: bool,
 }
 
 impl XorShift {
-    pub fn new(seed: u32, normalized: bool) -> Self {
+    pub fn new(seed: u32, scaled: bool) -> Self {
         XorShift {
             seed: seed,
             state: seed,
-            normalized: normalized,
+            scaled,
         }
     }
 
@@ -37,7 +37,7 @@ impl Iterator for XorShift {
 
         let mut n = x as f64;
 
-        if self.normalized {
+        if self.scaled {
             n /= u32::MAX as f64;
         }
 

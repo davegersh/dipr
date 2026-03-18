@@ -6,8 +6,7 @@ use dipr::prep::OneHotEncoder;
 use dipr::rand::XorShift;
 use dipr::{
     Model, Tensor,
-    layer::{Dense, Layer, ReLU, Sigmoid},
-    loss::BinaryCrossEntropy,
+    layer::{Dense, Layer, ReLU},
     optim::SGD,
 };
 
@@ -34,6 +33,7 @@ fn load_data(path: &str) -> (Vec<f32>, Vec<String>) {
         x_data.extend(f);
     }
 
+    // data shuffling
     let mut x_rand = XorShift::new(42, false);
     let mut y_rand = XorShift::new(42, false);
 
@@ -46,9 +46,9 @@ fn load_data(path: &str) -> (Vec<f32>, Vec<String>) {
 #[test]
 fn test_iris_converge() {
     // load data
-    let (x_data, y_data) = load_data("tests/iris_data/iris.data");
+    let (x_data, y_data) = load_data("tests/iris.data");
 
-    let x = Tensor::new(x_data, vec![y_data.len(), 4]);
+    let x = Tensor::new(x_data, vec![y_data.len(), 4]) / 10.0;
 
     // data prep
     let cats = vec![
@@ -60,25 +60,26 @@ fn test_iris_converge() {
 
     let y = enc.encode(&y_data);
 
-    println!("x: {:?} \n y: {:?}", x, y);
-
     // create model
     let mut model = Model::new(
-        Box::new(SGD::new(0.01)),
+        Box::new(SGD::new(1.0)),
         Box::new(CategoricalCrossEntropy::new()),
     );
 
-    model.add_layer(Dense::new(&[4, 16]));
-    model.add_layer(ReLU::new());
-    model.add_layer(Dense::new(&[16, 3]));
+    model.add_layer(Dense::new(&[4, 8]));
+    model.add_layer(ReLU::new(0.1));
+    model.add_layer(Dense::new(&[8, 8]));
+    model.add_layer(ReLU::new(0.1));
+    model.add_layer(Dense::new(&[8, 3]));
+    // Model returns logits not predictions! No softmax (baked into CCE)
 
     // train it
     let history = model.train(&x, &y, 100);
     println!("\nCost History: {:?}\n", history);
 
-    // test it
-    let final_preds = model.forward(&x);
-    println!("Final: {:?}", final_preds);
+    // check train convergence
+    let final_output = model.forward(&x);
+    let final_preds = final_output.softmax().map(|x| x.round());
 
-    assert_eq!(1.0, 0.0);
+    assert_eq!(final_preds, y);
 }

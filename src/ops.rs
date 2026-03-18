@@ -190,6 +190,43 @@ impl PartialEq for Tensor {
 }
 
 impl Tensor {
+    /// Returns the shape of a new tensor after ops broadcasting to another tensor (Returns None if not broadcastable)
+    pub fn broadcast_shape(&self, other: &Tensor) -> Option<Vec<usize>> {
+        if self.shape == other.shape {
+            return Some(self.shape.clone());
+        }
+
+        let max_rank = self.rank.max(other.rank);
+        let mut new_shape = Vec::with_capacity(max_rank);
+
+        for i in 0..max_rank {
+            let self_index = (i as i32) + (self.rank as i32) - (max_rank as i32);
+            let other_index = (i as i32) + (other.rank as i32) - (max_rank as i32);
+
+            if self_index < 0 {
+                new_shape.push(other.shape[i]);
+                continue;
+            } else if other_index < 0 {
+                new_shape.push(self.shape[i]);
+                continue;
+            }
+
+            let self_dim = self.shape[self_index as usize];
+            let other_dim = other.shape[other_index as usize];
+
+            if self_dim != other_dim {
+                if self_dim != 1 && other_dim != 1 {
+                    return None;
+                }
+                new_shape.push(self_dim.max(other_dim))
+            } else {
+                new_shape.push(self_dim);
+            }
+        }
+
+        Some(new_shape)
+    }
+
     pub fn matmul(&self, other: &Tensor) -> Tensor {
         assert_eq!(
             self.rank, other.rank,
@@ -290,41 +327,46 @@ impl Tensor {
         new
     }
 
-    /// Returns the shape of a new tensor after ops broadcasting to another tensor (Returns None if not broadcastable)
-    pub fn broadcast_shape(&self, other: &Tensor) -> Option<Vec<usize>> {
-        if self.shape == other.shape {
-            return Some(self.shape.clone());
-        }
+    pub fn sum_all(&self) -> Tensor {
+        let sum = self.data.iter().sum();
 
-        let max_rank = self.rank.max(other.rank);
-        let mut new_shape = Vec::with_capacity(max_rank);
+        let mut new_shape = self.shape.clone();
+        new_shape.fill(1);
 
-        for i in 0..max_rank {
-            let self_index = (i as i32) + (self.rank as i32) - (max_rank as i32);
-            let other_index = (i as i32) + (other.rank as i32) - (max_rank as i32);
+        Tensor::new(vec![sum], new_shape)
+    }
 
-            if self_index < 0 {
-                new_shape.push(other.shape[i]);
-                continue;
-            } else if other_index < 0 {
-                new_shape.push(self.shape[i]);
-                continue;
-            }
+    pub fn max(&self, axis: usize) -> Tensor {
+        let mut new_shape = self.shape.clone();
+        new_shape[axis] = 1;
 
-            let self_dim = self.shape[self_index as usize];
-            let other_dim = other.shape[other_index as usize];
+        let mut new = Tensor::zeros(&new_shape);
 
-            if self_dim != other_dim {
-                if self_dim != 1 && other_dim != 1 {
-                    return None;
-                }
-                new_shape.push(self_dim.max(other_dim))
-            } else {
-                new_shape.push(self_dim);
+        for i in 0..self.data.len() {
+            let mut coord = self.flat_index_to_coords(i);
+            coord[axis] = 0;
+
+            if self.data[i] > new[&coord] {
+                new[&coord] = self.data[i];
             }
         }
 
-        Some(new_shape)
+        new
+    }
+
+    pub fn ln(&self) -> Tensor {
+        self.map(|x| x.ln())
+    }
+
+    pub fn exp(&self) -> Tensor {
+        self.map(|x| x.exp())
+    }
+
+    pub fn softmax(&self) -> Tensor {
+        let exp = self.exp();
+        let exp_sum = exp.sum(1);
+
+        exp / exp_sum
     }
 }
 
@@ -463,5 +505,13 @@ mod tests {
 
         assert_eq!(t1.sum(0), Tensor::new(vec![9.0, 12.0], vec![1, 2]));
         assert_eq!(t1.sum(1), Tensor::new(vec![3.0, 7.0, 11.0,], vec![3, 1]));
+    }
+
+    #[test]
+    fn test_max() {
+        let t1 = Tensor::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![3, 2]);
+
+        assert_eq!(t1.max(0), Tensor::new(vec![5.0, 6.0], vec![1, 2]));
+        assert_eq!(t1.max(1), Tensor::new(vec![2.0, 4.0, 6.0,], vec![3, 1]));
     }
 }
