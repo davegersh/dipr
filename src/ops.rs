@@ -313,11 +313,15 @@ impl Tensor {
     }
 
     pub fn ln(&self) -> Tensor {
-        self.map(|x| x.ln())
+        self.map(f32::ln)
     }
 
     pub fn exp(&self) -> Tensor {
-        self.map(|x| x.exp())
+        self.map(f32::exp)
+    }
+
+    pub fn sqrt(&self) -> Tensor {
+        self.map(f32::sqrt)
     }
 
     pub fn softmax(&self) -> Tensor {
@@ -377,6 +381,23 @@ impl Tensor {
         self.reduce(axis, |slice| {
             slice.iter().copied().max_by(f32::total_cmp).unwrap()
         })
+    }
+
+    pub fn min(&self, axis: usize) -> Tensor {
+        self.reduce(axis, |slice| {
+            slice.iter().copied().min_by(f32::total_cmp).unwrap()
+        })
+    }
+
+    pub fn mean(&self, axis: usize) -> Tensor {
+        self.reduce(axis, |slice| {
+            (slice.iter().sum::<f32>()) / self.shape[axis] as f32
+        })
+    }
+
+    pub fn std(&self, axis: usize) -> Tensor {
+        let mean = self.mean(axis);
+        (self - mean).map(|x| x * x).mean(axis)
     }
 }
 
@@ -523,5 +544,32 @@ mod tests {
 
         assert_eq!(t1.max(0), Tensor::new(vec![5.0, 6.0], vec![1, 2]));
         assert_eq!(t1.max(1), Tensor::new(vec![2.0, 4.0, 6.0,], vec![3, 1]));
+    }
+
+    #[test]
+    fn test_min() {
+        let t1 = Tensor::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![3, 2]);
+
+        assert_eq!(t1.min(0), Tensor::new(vec![1.0, 2.0], vec![1, 2]));
+        assert_eq!(t1.min(1), Tensor::new(vec![1.0, 3.0, 5.0,], vec![3, 1]));
+    }
+
+    #[test]
+    fn test_mean() {
+        let t1 = Tensor::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![3, 2]);
+
+        assert_eq!(t1.mean(0), Tensor::new(vec![3.0, 4.0], vec![1, 2]));
+        assert_eq!(t1.mean(1), Tensor::new(vec![1.5, 3.5, 5.5,], vec![3, 1]));
+    }
+
+    #[test]
+    fn test_std() {
+        let t1 = Tensor::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![3, 2]);
+
+        assert_eq!(
+            t1.std(0),
+            Tensor::new(vec![8.0 / 3.0, 8.0 / 3.0], vec![1, 2])
+        );
+        assert_eq!(t1.std(1), Tensor::new(vec![0.25, 0.25, 0.25], vec![3, 1]));
     }
 }
