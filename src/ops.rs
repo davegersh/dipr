@@ -291,6 +291,7 @@ impl Tensor {
         self.permute(&perm)
     }
 
+    // Other element-wise ops
     pub fn map_mut<F>(&mut self, f: F) -> &mut Self
     where
         F: Fn(f32) -> f32,
@@ -311,49 +312,6 @@ impl Tensor {
         new
     }
 
-    pub fn sum(&self, axis: usize) -> Tensor {
-        let mut new_shape = self.shape.clone();
-        new_shape[axis] = 1;
-
-        let mut new = Tensor::zeros(&new_shape);
-
-        for i in 0..self.data.len() {
-            let mut coord = self.flat_index_to_coords(i);
-            coord[axis] = 0;
-
-            new[&coord] += self.data[i];
-        }
-
-        new
-    }
-
-    pub fn sum_all(&self) -> Tensor {
-        let sum = self.data.iter().sum();
-
-        let mut new_shape = self.shape.clone();
-        new_shape.fill(1);
-
-        Tensor::new(vec![sum], new_shape)
-    }
-
-    pub fn max(&self, axis: usize) -> Tensor {
-        let mut new_shape = self.shape.clone();
-        new_shape[axis] = 1;
-
-        let mut new = Tensor::zeros(&new_shape);
-
-        for i in 0..self.data.len() {
-            let mut coord = self.flat_index_to_coords(i);
-            coord[axis] = 0;
-
-            if self.data[i] > new[&coord] {
-                new[&coord] = self.data[i];
-            }
-        }
-
-        new
-    }
-
     pub fn ln(&self) -> Tensor {
         self.map(|x| x.ln())
     }
@@ -367,6 +325,58 @@ impl Tensor {
         let exp_sum = exp.sum(1);
 
         exp / exp_sum
+    }
+
+    // Reduction Ops
+    pub fn reduce<F>(&self, axis: usize, op: F) -> Self
+    where
+        F: Fn(&Vec<f32>) -> f32,
+    {
+        let mut new_shape = self.shape.clone();
+        new_shape[axis] = 1;
+
+        let pre: usize = self.shape.iter().take(axis).product();
+        let slice_size: usize = self.shape[axis];
+        let post: usize = self.shape.iter().skip(axis + 1).product();
+
+        let mut output_data = Vec::with_capacity(post);
+
+        for i in 0..pre {
+            for j in 0..post {
+                // Collect axis slice elements
+                let mut slice = Vec::with_capacity(slice_size);
+
+                for k in 0..slice_size {
+                    let idx = (i * slice_size * post) + (k * post) + j;
+                    slice.push(self.data[idx]);
+                }
+
+                // Calculate on slice
+                let result = op(&slice);
+                output_data.push(result);
+            }
+        }
+
+        Tensor::new(output_data, new_shape)
+    }
+
+    pub fn sum(&self, axis: usize) -> Tensor {
+        self.reduce(axis, |slice| slice.iter().sum())
+    }
+
+    pub fn sum_all(&self) -> Tensor {
+        let sum = self.data.iter().sum();
+
+        let mut new_shape = self.shape.clone();
+        new_shape.fill(1);
+
+        Tensor::new(vec![sum], new_shape)
+    }
+
+    pub fn max(&self, axis: usize) -> Tensor {
+        self.reduce(axis, |slice| {
+            slice.iter().copied().max_by(f32::total_cmp).unwrap()
+        })
     }
 }
 
