@@ -1,4 +1,4 @@
-use crate::tensor::Tensor;
+use super::Tensor;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 // Macro for overloading operators for element-wise ops (including scalar)
@@ -325,10 +325,11 @@ impl Tensor {
     }
 
     pub fn softmax(&self) -> Tensor {
-        let exp = self.exp();
+        let mut exp = self.exp();
         let exp_sum = exp.sum(1);
 
-        exp / exp_sum
+        exp /= &exp_sum;
+        exp
     }
 
     // Reduction Ops
@@ -397,7 +398,24 @@ impl Tensor {
 
     pub fn std(&self, axis: usize) -> Tensor {
         let mean = self.mean(axis);
-        (self - mean).map(|x| x * x).mean(axis)
+        (self - mean).map_mut(|x| x * x).mean(axis)
+    }
+
+    pub fn normalize(&self, axis: usize) -> Tensor {
+        // 1. Calculate Mean (Collapse rows, keep columns)
+        let mu = self.mean(axis);
+
+        // 2. Calculate Std Dev (The "spread")
+        let sigma = self.std(axis);
+
+        (self - mu) / (sigma + 1e-8)
+    }
+
+    pub fn min_max_scale(&self, axis: usize) -> Tensor {
+        let min = self.min(axis);
+        let max = self.max(axis);
+
+        (self - &min) / (max - &min)
     }
 }
 

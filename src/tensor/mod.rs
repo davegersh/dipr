@@ -1,3 +1,5 @@
+pub mod ops;
+
 use super::rand::XorShift;
 use std::ops::{Index, IndexMut};
 

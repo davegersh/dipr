@@ -6,7 +6,7 @@ use dipr::prep::OneHotEncoder;
 use dipr::rand::XorShift;
 use dipr::{
     Model, Tensor,
-    layer::{Dense, Layer, ReLU},
+    layer::{Dense, Layer, WeightInit, activation::ReLU},
     optim::SGD,
 };
 
@@ -48,7 +48,7 @@ fn test_iris_converge() {
     // load data
     let (x_data, y_data) = load_data("tests/iris.data");
 
-    let x = Tensor::new(x_data, vec![y_data.len(), 4]) / 10.0;
+    let x = Tensor::new(x_data, vec![y_data.len(), 4]).min_max_scale(0);
 
     // data prep
     let cats = vec![
@@ -66,11 +66,11 @@ fn test_iris_converge() {
         Box::new(CategoricalCrossEntropy::new()),
     );
 
-    model.add_layer(Dense::new(&[4, 8]));
+    model.add_layer(Dense::new(4, 8, WeightInit::Uniform));
     model.add_layer(ReLU::new(0.1));
-    model.add_layer(Dense::new(&[8, 8]));
+    model.add_layer(Dense::new(8, 8, WeightInit::Uniform));
     model.add_layer(ReLU::new(0.1));
-    model.add_layer(Dense::new(&[8, 3]));
+    model.add_layer(Dense::new(8, 3, WeightInit::Uniform));
     // Model returns logits not predictions! No softmax (baked into CCE)
 
     // train it

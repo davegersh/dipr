@@ -1,6 +1,6 @@
 use dipr::{
     Model, Tensor,
-    layer::{Dense, Layer, ReLU, Sigmoid},
+    layer::{Dense, Layer, WeightInit, activation::ReLU, activation::Sigmoid},
     loss::BinaryCrossEntropy,
     optim::SGD,
 };
@@ -17,9 +17,9 @@ fn test_xor_converge() {
         Box::new(BinaryCrossEntropy::new()),
     );
 
-    model.add_layer(Dense::new(&[2, 5]));
+    model.add_layer(Dense::new(2, 5, WeightInit::Uniform));
     model.add_layer(ReLU::new(0.0));
-    model.add_layer(Dense::new(&[5, 1]));
+    model.add_layer(Dense::new(5, 1, WeightInit::Uniform));
     model.add_layer(Sigmoid::new());
 
     // train it

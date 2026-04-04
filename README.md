@@ -26,8 +26,6 @@ cargo test
 
 ## Next Steps 
 Below is a non-comphrensive list of ideas or things to work on:
-- [ ] Add options for Dense layer weight initialization (zeros, random, normalized)
-- [ ] Mapping data by axis
 - [ ] Argmax
 - [ ] Metrics module for calculating categorical accuracy, etc.
 - [ ] Support for Mini-batch GD and Adam optimizers
