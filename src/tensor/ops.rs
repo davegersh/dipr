@@ -228,14 +228,27 @@ impl Tensor {
     }
 
     pub fn matmul(&self, other: &Tensor) -> Tensor {
-        assert_eq!(
-            self.rank, other.rank,
-            "Matrix Multiplication only possible with Tensors of equal rank."
-        );
-
-        if self.rank > 2 {
-            todo!("Add support for batched matmul! This only works properly with 2D tensors!");
+        match (self.rank, other.rank) {
+            (2, 2) => self.matmul_2d(other),
+            (3, 3) => self.matmul_batch(other),
+            _ => todo!("Handle n-dimensional tensors!"),
         }
+
+        // For n-dimensional tensors:
+        //  1. Extract the batch dimensions (from 0..rank-2 exclusive)
+        //  2. Flatten the batch dimensions and make a new shape for both tensors with flatten batch dims
+        //  3. Reshape both tensors so that they are both rank 3 tensors (flatten batch dims)
+        //  4. Run the matmul batch on them...
+        //  5. Take new matmul result tensors and reshape it so that the original batch dimensions are unflattened
+        //
+    }
+
+    pub fn matmul_2d(&self, other: &Tensor) -> Tensor {
+        assert_eq!(
+            self.rank == 2,
+            other.rank == 2,
+            "2D Matrix Multiplication requires two rank 2 tensors!"
+        );
 
         let rank = self.rank;
 
@@ -259,12 +272,57 @@ impl Tensor {
         for i in 0..m {
             for j in 0..n {
                 let mut dot = 0.0;
-
                 for k in 0..k {
                     dot += self[&[i, k]] * other[&[k, j]];
                 }
-
                 new[&[i, j]] = dot; //dot product of row i in A and column j in B
+            }
+        }
+
+        new
+    }
+
+    pub fn matmul_batch(&self, other: &Tensor) -> Tensor {
+        assert_eq!(
+            self.rank == 3,
+            other.rank == 3,
+            "Batch Matrix Multiplication requires two rank 3 tensors!"
+        );
+
+        assert_eq!(
+            self.shape[0], other.shape[0],
+            "Both tensors must have the same number of batches!"
+        );
+
+        let rank = self.rank;
+
+        let b = self.shape[0];
+        let m = self.shape[rank - 2];
+        let n = other.shape[rank - 1];
+        let k = self.shape[rank - 1];
+
+        assert_eq!(
+            k,
+            other.shape[rank - 2],
+            "Invalid shapes for matmul! Inner shapes must match: {:?} * {:?}",
+            self.shape,
+            other.shape
+        );
+
+        let mut new_shape = self.shape.clone();
+        new_shape[rank - 1] = n;
+
+        let mut new = Tensor::zeros(&new_shape);
+
+        for b in 0..b {
+            for i in 0..m {
+                for j in 0..n {
+                    let mut dot = 0.0;
+                    for k in 0..k {
+                        dot += self[&[b, i, k]] * other[&[b, k, j]];
+                    }
+                    new[&[i, j]] = dot; //dot product of row i in A and column j in B
+                }
             }
         }
 
@@ -310,6 +368,10 @@ impl Tensor {
         let mut new = self.clone();
         new.map_mut(f);
         new
+    }
+
+    pub fn zero(&mut self) {
+        self.map_mut(|_| 0.0);
     }
 
     pub fn ln(&self) -> Tensor {

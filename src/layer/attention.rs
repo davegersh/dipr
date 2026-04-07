@@ -16,7 +16,7 @@ pub struct Attention {
 }
 
 impl Attention {
-    fn new(d_model: usize, d_k: usize) -> Self {
+    pub fn new(d_model: usize, d_k: usize) -> Self {
         let weights_shape = [d_model, d_k];
 
         Self {

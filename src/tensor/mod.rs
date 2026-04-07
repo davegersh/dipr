@@ -80,8 +80,68 @@ impl Tensor {
         coords
     }
 
-    pub fn zero(&mut self) {
-        self.map_mut(|_| 0.0);
+    // Reshaping
+    pub fn reshape_mut(&mut self, new_shape: &[usize]) {
+        let new_total_elements: usize = new_shape.iter().product();
+
+        assert_eq!(
+            new_total_elements,
+            self.shape.iter().product(),
+            "New shape for reshape must have the same number of total elements!"
+        );
+
+        self.shape = new_shape.to_vec();
+        self.stride = Self::shape_to_stride(&new_shape);
+        self.rank = new_shape.len();
+    }
+
+    pub fn reshape(&self, new_shape: &[usize]) -> Tensor {
+        let mut new = self.clone();
+        new.reshape_mut(new_shape);
+
+        new
+    }
+
+    /// Returns a new tensor with shape flattened to rank 1.
+    /// Ex. The shape [B, M, N] becomes [B * M * N]
+    pub fn flatten(&self) -> Tensor {
+        self.reshape(&[self.shape.iter().product()])
+    }
+
+    /// Returns a new tensor based on this tensors shape to a target rank.
+    /// The shape is calculated by multiplying the shape array from the left until the target rank is met.
+    /// Ex. For a target rank of 3, the shape [B, H, M, N] becomes [B*H, M, N].
+    pub fn flatten_left(&self, target_rank: usize) -> Tensor {
+        assert!(
+            target_rank < self.rank,
+            "Target rank for flattening must be smaller than current rank!"
+        );
+
+        let rank_diff = self.rank - target_rank;
+
+        let new_shape = &mut self.shape.clone()[rank_diff..self.rank];
+
+        let flattened_elements: usize = self.shape[0..rank_diff].iter().product();
+        new_shape[0] *= flattened_elements;
+
+        self.reshape(new_shape)
+    }
+
+    /// Returns a new tensor based on this tensors shape to a target rank.
+    /// The shape is calculated by multiplying the shape array from the right until the target rank is met.
+    /// Ex. For a target rank of 3, the shape [B, H, M, N] becomes [B, H, M*N].
+    pub fn flatten_right(&self, target_rank: usize) -> Tensor {
+        assert!(
+            target_rank < self.rank,
+            "Target rank for flattening must be smaller than current rank!"
+        );
+
+        let new_shape = &mut self.shape.clone()[0..target_rank];
+
+        let flattened_elements: usize = self.shape[target_rank..self.rank].iter().product();
+        new_shape[target_rank - 1] *= flattened_elements;
+
+        self.reshape(new_shape)
     }
 }
 
@@ -142,5 +202,53 @@ mod tests {
 
         let t2 = Tensor::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![3, 2]);
         assert_eq!(t2[&[0, 1]], 2.0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_reshape_panic() {
+        let t1 = Tensor::zeros(&[1, 2, 3, 4]);
+
+        // Panics due to new shape containing more elements than original
+        t1.reshape(&[100]);
+    }
+
+    #[test]
+    fn test_reshape() {
+        let t1 = Tensor::zeros(&[1, 2, 3, 4]);
+
+        let t2 = t1.reshape(&[6, 4]);
+        assert_eq!(t2.shape, vec![6, 4]);
+        assert_eq!(t2.stride, vec![4, 1]);
+    }
+
+    #[test]
+    fn test_flatten() {
+        let t1 = Tensor::zeros(&[1, 2, 3, 4]);
+
+        let t2 = t1.flatten();
+        assert_eq!(t2.shape, vec![24]);
+    }
+
+    #[test]
+    fn test_flatten_left() {
+        let t1 = Tensor::zeros(&[1, 2, 3, 4]);
+
+        let t2 = t1.flatten_left(2);
+        assert_eq!(t2.shape, vec![6, 4]);
+
+        let t3 = t1.flatten_left(1);
+        assert_eq!(t3.shape, vec![24]);
+    }
+
+    #[test]
+    fn test_flatten_right() {
+        let t1 = Tensor::zeros(&[1, 2, 3, 4]);
+
+        let t2 = t1.flatten_right(2);
+        assert_eq!(t2.shape, vec![1, 24]);
+
+        let t3 = t1.flatten_right(1);
+        assert_eq!(t3.shape, vec![24]);
     }
 }
