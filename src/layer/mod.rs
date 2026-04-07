@@ -1,8 +1,8 @@
 pub mod dense;
 pub use dense::Dense;
 pub use dense::WeightInit;
-
 pub mod activation;
+pub mod attention;
 
 use crate::tensor::Tensor;
 
@@ -19,12 +19,12 @@ pub trait Layer {
     /// Same as forward(...) with added functionality to prepare data for backward(...)
     fn forward_train(&mut self, x: &Tensor) -> Tensor;
 
-    /// Gradient from next layer => gradient of this layer
+    /// Gradient from next layer (dy_dj) => Gradient of this layer (dy_dx)
     fn backward(&mut self, dj_dy: &Tensor) -> Tensor;
 
-    /// Returns a list of tuples containing the parameter and it's gradient respectively
+    /// Returns a list of tuples containing the parameter and its gradient respectively
     fn parameters_mut(&mut self) -> Vec<(&mut Tensor, &Tensor)>;
 
-    /// Resets the Layer's gradients to zero
+    /// Resets the layer's gradients to zero
     fn zero_grad(&mut self);
 }

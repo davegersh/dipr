@@ -1,10 +1,6 @@
 use super::Layer;
 use crate::Tensor;
 
-// Make a new enum for initializing weights
-// Should include He and Xavier init with an optional seed
-//
-
 pub enum WeightInit {
     Uniform,
     Xavier,

@@ -80,3 +80,41 @@ impl Layer for Sigmoid {
 
     fn zero_grad(&mut self) {}
 }
+
+pub struct Softmax {
+    pub y_cache: Option<Tensor>,
+}
+
+impl Softmax {
+    pub fn new() -> Self {
+        Self { y_cache: None }
+    }
+}
+
+impl Layer for Softmax {
+    fn forward(&mut self, x: &Tensor) -> Tensor {
+        x.softmax()
+    }
+
+    fn forward_train(&mut self, x: &Tensor) -> Tensor {
+        let y = self.forward(x);
+        self.y_cache = Some(y.clone());
+
+        y
+    }
+
+    fn backward(&mut self, dj_dy: &Tensor) -> Tensor {
+        if let Some(y) = &self.y_cache {
+            // Faster jacobian calculation for softmax
+            let dot = (dj_dy * y).sum_all();
+            return y * (dj_dy - dot);
+        }
+        panic!("Output not cached when calculating gradient for Sigmoid layer!");
+    }
+
+    fn parameters_mut(&mut self) -> Vec<(&mut Tensor, &Tensor)> {
+        vec![]
+    }
+
+    fn zero_grad(&mut self) {}
+}
