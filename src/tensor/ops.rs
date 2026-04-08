@@ -190,6 +190,20 @@ impl PartialEq for Tensor {
 }
 
 impl Tensor {
+    // Returns the size of an axis when broadcasted to another tensor at the same axis
+    pub fn broadcast_dim(&self, other: &Tensor, axis: usize) -> Option<usize> {
+        let dim1 = self.shape[axis];
+        let dim2 = other.shape[axis];
+
+        if dim1 == dim2 || dim2 == 1 {
+            Some(dim1)
+        } else if dim1 == 1 {
+            Some(dim2)
+        } else {
+            None
+        }
+    }
+
     /// Returns the shape of a new tensor after ops broadcasting to another tensor (Returns None if not broadcastable)
     pub fn broadcast_shape(&self, other: &Tensor) -> Option<Vec<usize>> {
         if self.shape == other.shape {
@@ -218,7 +232,7 @@ impl Tensor {
                 if self_dim != 1 && other_dim != 1 {
                     return None;
                 }
-                new_shape.push(self_dim.max(other_dim))
+                new_shape.push(self_dim.max(other_dim));
             } else {
                 new_shape.push(self_dim);
             }
@@ -231,16 +245,47 @@ impl Tensor {
         match (self.rank, other.rank) {
             (2, 2) => self.matmul_2d(other),
             (3, 3) => self.matmul_batch(other),
-            _ => todo!("Handle n-dimensional tensors!"),
-        }
+            (3, 2) => {
+                let mut new_shape = other.shape.clone();
+                new_shape.insert(0, 1);
 
-        // For n-dimensional tensors:
-        //  1. Extract the batch dimensions (from 0..rank-2 exclusive)
-        //  2. Flatten the batch dimensions and make a new shape for both tensors with flatten batch dims
-        //  3. Reshape both tensors so that they are both rank 3 tensors (flatten batch dims)
-        //  4. Run the matmul batch on them...
-        //  5. Take new matmul result tensors and reshape it so that the original batch dimensions are unflattened
-        //
+                let reshaped_other = other.reshape(&new_shape);
+                self.matmul_batch(&reshaped_other)
+            }
+            (2, 3) => {
+                let mut new_shape = self.shape.clone();
+                new_shape.insert(0, 1);
+
+                let reshaped_self = self.reshape(&new_shape);
+                reshaped_self.matmul_batch(other)
+            }
+            (r1, r2) if r1 > 3 && r2 > 3 => {
+                // flatten self and other batch dimensions to a rank 3 tensor
+                let flat_self = self.flatten_left(3);
+                let flat_other = other.flatten_left(3);
+
+                // perform a matrix multiplication on each flattened batch
+                let mut result = flat_self.matmul_batch(&flat_other);
+
+                // take original batch dimensions
+                let mut new_shape = self.shape[0..self.rank - 2].to_vec();
+
+                // add new 2d matrix multiplication shapes
+                new_shape.push(result.shape[1]);
+                new_shape.push(result.shape[2]);
+
+                // reshape matrix multiplication back to original shape
+                result.reshape_mut(&new_shape);
+
+                result
+            }
+            _ => {
+                panic!(
+                    "Cannot complete matrix multiplication with ranks: {:?} @ {:?}",
+                    self.rank, other.rank
+                )
+            }
+        }
     }
 
     pub fn matmul_2d(&self, other: &Tensor) -> Tensor {
@@ -289,14 +334,14 @@ impl Tensor {
             "Batch Matrix Multiplication requires two rank 3 tensors!"
         );
 
-        assert_eq!(
-            self.shape[0], other.shape[0],
-            "Both tensors must have the same number of batches!"
-        );
+        // broadcast only the batch dimension (handles the case if self or other is 1)
+        let b_dim = self.broadcast_dim(other, 0);
+
+        assert_ne!(b_dim, None, "Cannot broadcast batch dimension for matmul!");
 
         let rank = self.rank;
 
-        let b = self.shape[0];
+        let b = b_dim.unwrap();
         let m = self.shape[rank - 2];
         let n = other.shape[rank - 1];
         let k = self.shape[rank - 1];
@@ -321,7 +366,7 @@ impl Tensor {
                     for k in 0..k {
                         dot += self[&[b, i, k]] * other[&[b, k, j]];
                     }
-                    new[&[i, j]] = dot; //dot product of row i in A and column j in B
+                    new[&[b, i, j]] = dot; //dot product of row i in A and column j in B
                 }
             }
         }
@@ -344,7 +389,7 @@ impl Tensor {
         let mut perm: Vec<usize> = (0..self.rank).collect();
 
         // swap last two shapes and strides for matrix transposition
-        perm.swap(0, 1);
+        perm.swap(self.rank - 2, self.rank - 1);
 
         self.permute(&perm)
     }
@@ -486,12 +531,34 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_matmul() {
+    fn test_matmul_2d() {
         let t1 = Tensor::new(vec![4.0, 2.0, -3.0, 1.0], vec![2, 2]);
         let t2 = Tensor::new(vec![1.0, 5.0, 3.0, 2.0, 7.0, -4.0], vec![2, 3]);
 
-        let m = Tensor::matmul(&t1, &t2);
+        let m = Tensor::matmul_2d(&t1, &t2);
         let expected = Tensor::new(vec![8.0, 34.0, 4.0, -1.0, -8.0, -13.0], vec![2, 3]);
+
+        assert_eq!(m, expected);
+    }
+
+    #[test]
+    fn test_matmul_3d() {
+        let t1 = Tensor::new(
+            vec![4.0, 2.0, -3.0, 1.0, 4.0, 2.0, -3.0, 1.0],
+            vec![2, 2, 2],
+        );
+        let t2 = Tensor::new(
+            vec![1.0, 5.0, 3.0, 2.0, 7.0, -4.0, 1.0, 5.0, 3.0, 2.0, 7.0, -4.0],
+            vec![2, 2, 3],
+        );
+
+        let m = Tensor::matmul_batch(&t1, &t2);
+        let expected = Tensor::new(
+            vec![
+                8.0, 34.0, 4.0, -1.0, -8.0, -13.0, 8.0, 34.0, 4.0, -1.0, -8.0, -13.0,
+            ],
+            vec![2, 2, 3],
+        );
 
         assert_eq!(m, expected);
     }
@@ -500,6 +567,15 @@ mod tests {
     fn test_transpose() {
         let t1 = Tensor::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![2, 3]);
         assert_eq!(t1.permute(&[1, 0]), t1.transpose());
+
+        // 3D "transpose" test (just swaps last two shapes)
+        let t1 = Tensor::new(
+            vec![
+                1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0,
+            ],
+            vec![2, 2, 3],
+        );
+        assert_eq!(t1.permute(&[0, 2, 1]), t1.transpose());
     }
 
     #[test]
@@ -588,11 +664,9 @@ mod tests {
         let t2 = Tensor::fill(&[2, 3], 2.0);
 
         t1 *= &t2;
-
         assert_eq!(t1, Tensor::fill(&[2, 3], 2.0));
 
         t1 *= 0.;
-
         assert_eq!(t1, Tensor::zeros(&[2, 3]));
     }
 

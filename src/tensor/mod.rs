@@ -18,13 +18,21 @@ impl Tensor {
         strides[shape.len() - 1] = 1;
 
         for i in (0..shape.len() - 1).rev() {
-            strides[i] = strides[i + 1] * shape[i + 1];
+            if shape[i] > 1 {
+                strides[i] = strides[i + 1] * shape[i + 1];
+            }
         }
 
         strides
     }
 
     pub fn new(data: Vec<f32>, shape: Vec<usize>) -> Self {
+        assert_eq!(
+            data.len(),
+            shape.iter().product(),
+            "Length of data array for a new tensor should match the total number of elements for the shape!"
+        );
+
         let stride = Self::shape_to_stride(&shape);
         let rank = shape.len();
 
@@ -63,6 +71,13 @@ impl Tensor {
 
     pub fn coords_to_index(&self, coords: &[usize]) -> usize {
         let mut index = 0;
+
+        assert_eq!(
+            self.rank,
+            coords.len(),
+            "Cannot index with coordinates larger than the rank of the tensor!"
+        );
+
         for i in 0..coords.len() {
             index += coords[i] * self.stride[i];
         }
@@ -193,6 +208,9 @@ mod tests {
         // 3D
         let stride2 = Tensor::shape_to_stride(&[2, 2, 3]);
         assert_eq!(stride2, vec![6, 3, 1]);
+
+        let stride3 = Tensor::shape_to_stride(&[1, 3, 4]);
+        assert_eq!(stride3, vec![0, 4, 1]);
     }
 
     #[test]
@@ -202,6 +220,9 @@ mod tests {
 
         let t2 = Tensor::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![3, 2]);
         assert_eq!(t2[&[0, 1]], 2.0);
+
+        let t3 = Tensor::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![1, 3, 2]);
+        assert_eq!(t3[&[1, 0, 1]], 2.0);
     }
 
     #[test]

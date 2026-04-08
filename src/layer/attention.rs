@@ -36,6 +36,9 @@ impl Attention {
         let query = x.matmul(&self.weights_q); // Q = x @ w_q
         let key = x.matmul(&self.weights_k); // K = x @ w_k
 
+        println!("{:?}", key.shape);
+        println!("{:?}", query.shape);
+
         // S = (Q @ K^T) / sqrt(d)
         query.matmul(&key.transpose()) / (self.d_k as f32).sqrt()
     }
@@ -123,10 +126,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_shape() {
+    fn test_output_shape() {
         let mut attn = Attention::new(4, 4);
-        let x = Tensor::ones(&[3, 4]);
-        let out = attn.forward(&x);
+        let x = Tensor::ones(&[2, 2, 4]);
+
+        let out = attn.forward_train(&x);
 
         assert_eq!(x.shape, out.shape);
     }

@@ -9,7 +9,7 @@ pub struct LogLoss;
 
 impl Loss for LogLoss {
     fn compute(&self, y_truth: &Tensor, y_pred: &Tensor) -> Tensor {
-        -y_truth * y_pred.map(|x| x.ln()) - (1.0 - y_truth) * y_pred.map(|x| (1.0 - x).ln())
+        -y_truth * y_pred.ln() - (1.0 - y_truth) * y_pred.map(|x| (1.0 - x).ln())
     }
 
     fn compute_derivative(&self, y_truth: &Tensor, y_pred: &Tensor) -> Tensor {
