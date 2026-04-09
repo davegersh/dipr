@@ -57,9 +57,8 @@ macro_rules! element_op {
         impl $op_trait<&Tensor> for &Tensor {
             type Output = Tensor;
             fn $op_func(self, other: &Tensor) -> Self::Output {
-                let mut op_clone = self.clone();
-                op_clone $assign_op other;
-                op_clone
+                let self_clone = self.clone();
+                self_clone $op other // Owned + Ref
             }
         }
 
@@ -67,7 +66,7 @@ macro_rules! element_op {
         impl $op_trait<&Tensor> for Tensor {
             type Output = Tensor;
             fn $op_func(mut self, other: &Tensor) -> Self::Output {
-                self $assign_op other;
+                self $assign_op other; // Owned += Ref
                 self
             }
         }
@@ -75,9 +74,8 @@ macro_rules! element_op {
         // Ref + Owned
         impl $op_trait<Tensor> for &Tensor {
             type Output = Tensor;
-            fn $op_func(self, mut other: Tensor) -> Self::Output {
-                other $assign_op self;
-                other
+            fn $op_func(self, other: Tensor) -> Self::Output {
+                self $op &other // Ref + Ref
             }
         }
 
@@ -85,7 +83,7 @@ macro_rules! element_op {
         impl $op_trait<Tensor> for Tensor {
             type Output = Tensor;
             fn $op_func(self, other: Tensor) -> Self::Output {
-                self $op &other
+                self $op &other // Owned + Ref
             }
         }
 
@@ -349,7 +347,7 @@ impl Tensor {
         assert_eq!(
             k,
             other.shape[rank - 2],
-            "Invalid shapes for matmul! Inner shapes must match: {:?} * {:?}",
+            "Invalid shapes for matmul! Inner shapes must match: {:?} @ {:?}",
             self.shape,
             other.shape
         );
@@ -432,10 +430,13 @@ impl Tensor {
     }
 
     pub fn softmax(&self) -> Tensor {
-        let mut exp = self.exp();
-        let exp_sum = exp.sum(1);
+        let max = self.max(self.rank - 1);
 
-        exp /= &exp_sum;
+        let mut exp = (self - max).exp();
+
+        let exp_sum = exp.sum(self.rank - 1);
+
+        exp /= &(exp_sum + 1e-8);
         exp
     }
 

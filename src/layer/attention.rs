@@ -36,9 +36,6 @@ impl Attention {
         let query = x.matmul(&self.weights_q); // Q = x @ w_q
         let key = x.matmul(&self.weights_k); // K = x @ w_k
 
-        println!("{:?}", key.shape);
-        println!("{:?}", query.shape);
-
         // S = (Q @ K^T) / sqrt(d)
         query.matmul(&key.transpose()) / (self.d_k as f32).sqrt()
     }
@@ -76,7 +73,7 @@ impl Layer for Attention {
                 let value = x.matmul(&self.weights_v);
 
                 // gradient for softmax output
-                let dj_da = dj_dy.matmul(&value);
+                let dj_da = dj_dy.matmul(&value.transpose());
 
                 // gradient for score
                 let dj_ds = self.softmax.backward(&dj_da);
@@ -133,5 +130,38 @@ mod tests {
         let out = attn.forward_train(&x);
 
         assert_eq!(x.shape, out.shape);
+    }
+
+    #[test]
+    fn test_attention_weights_sum_to_one() {
+        let mut attn = Attention::new(4, 4);
+        let x = Tensor::iota(&[2, 2, 4]);
+
+        let _output = attn.forward(&x);
+        let score = attn.compute_score(&x);
+        let weights = score.softmax();
+
+        // Each row should sum to 1.0
+        assert_eq!(weights.sum(2).data, vec![1.0, 1.0, 1.0, 1.0]);
+    }
+    // Test 2: Attention Backward Pass
+    #[test]
+    fn test_attention_backward() {
+        let mut attn = Attention::new(4, 4);
+        let x = Tensor::iota(&[2, 2, 4]);
+
+        let _output = attn.forward_train(&x);
+
+        // dummy gradient
+        let dl_dout = Tensor::ones(&[2, 2, 4]);
+
+        let dl_dx = attn.backward(&dl_dout);
+
+        // check gradient shape
+        assert_eq!(dl_dx.shape, vec![2, 2, 4]);
+
+        // Check gradients are non-zero
+        let has_grad = dl_dx.data.iter().any(|&v| v.abs() > 1e-6);
+        assert!(has_grad, "Gradients should be non-zero");
     }
 }

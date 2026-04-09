@@ -1,7 +1,7 @@
 pub mod ops;
 
 use super::rand::XorShift;
-use std::ops::{Index, IndexMut};
+use std::ops::{Index, IndexMut, Range};
 
 #[derive(Clone, Debug)]
 pub struct Tensor {
@@ -57,6 +57,16 @@ impl Tensor {
 
     pub fn ones(shape: &[usize]) -> Self {
         Self::fill(shape, 1.)
+    }
+
+    pub fn arange(range: Range<i32>, shape: &[usize]) -> Self {
+        let data: Vec<f32> = range.map(|x| x as f32).collect();
+        Self::new(data, shape.to_vec())
+    }
+
+    pub fn iota(shape: &[usize]) -> Self {
+        let total_elements: usize = shape.iter().product();
+        Self::arange(1..(total_elements as i32) + 1, shape)
     }
 
     pub fn rand(shape: &[usize], seed: u32) -> Self {
@@ -184,6 +194,12 @@ mod tests {
     fn test_fill() {
         let t = Tensor::fill(&[2, 3], 42.);
         assert_eq!(t.data, vec![42., 42., 42., 42., 42., 42.]);
+    }
+
+    #[test]
+    fn test_arange() {
+        let t = Tensor::arange(0..6, &[2, 3]);
+        assert_eq!(t.data, vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0]);
     }
 
     #[test]
