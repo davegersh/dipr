@@ -62,19 +62,19 @@ fn test_iris_converge() {
 
     // create model
     let mut model = Model::new(
-        Box::new(SGD::new(1.0)),
+        Box::new(SGD::new(1.2)),
         Box::new(CategoricalCrossEntropy::new()),
     );
 
-    model.add_layer(Dense::new(4, 8, WeightInit::Uniform));
-    model.add_layer(ReLU::new(0.1));
-    model.add_layer(Dense::new(8, 8, WeightInit::Uniform));
-    model.add_layer(ReLU::new(0.1));
-    model.add_layer(Dense::new(8, 3, WeightInit::Uniform));
+    model.add_layer(Dense::new(4, 6, WeightInit::Uniform));
+    model.add_layer(ReLU::new(0.25));
+    model.add_layer(Dense::new(6, 6, WeightInit::Uniform));
+    model.add_layer(ReLU::new(0.25));
+    model.add_layer(Dense::new(6, 3, WeightInit::Uniform));
     // Model returns logits not predictions! No softmax (baked into CCE)
 
     // train it
-    let history = model.train(&x, &y, 100);
+    let history = model.train(&x, &y, 50);
     println!("\nCost History: {:?}\n", history);
 
     // check train convergence

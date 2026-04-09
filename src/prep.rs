@@ -44,7 +44,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn one_hot_encoder_test() {
+    fn test_one_hot_encode() {
         let cats = vec![
             String::from("Red"),
             String::from("Green"),

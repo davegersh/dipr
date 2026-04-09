@@ -1,3 +1,4 @@
+pub mod arithmetic;
 pub mod ops;
 
 use super::rand::XorShift;
@@ -44,6 +45,7 @@ impl Tensor {
         }
     }
 
+    /// Returns a new tensor with data consiting entirely of the given fill value
     pub fn fill(shape: &[usize], fill_value: f32) -> Self {
         let total_elements = shape.iter().product();
         let data = vec![fill_value; total_elements];
@@ -51,22 +53,26 @@ impl Tensor {
         Self::new(data, shape.to_vec())
     }
 
+    /// Returns a new tensor with data consiting entirely 0.0
     pub fn zeros(shape: &[usize]) -> Self {
         Self::fill(shape, 0.)
     }
 
+    /// Returns a new tensor with data consiting entirely 1.0
     pub fn ones(shape: &[usize]) -> Self {
         Self::fill(shape, 1.)
     }
 
-    pub fn arange(range: Range<i32>, shape: &[usize]) -> Self {
+    /// Returns a new tensor filled with data defined by collecting the given range
+    pub fn arange(shape: &[usize], range: Range<i32>) -> Self {
         let data: Vec<f32> = range.map(|x| x as f32).collect();
         Self::new(data, shape.to_vec())
     }
 
+    /// Returns a tensor with data made of increasing integer values starting from 1
     pub fn iota(shape: &[usize]) -> Self {
         let total_elements: usize = shape.iter().product();
-        Self::arange(1..(total_elements as i32) + 1, shape)
+        Self::arange(shape, 1..(total_elements as i32) + 1)
     }
 
     pub fn rand(shape: &[usize], seed: u32) -> Self {
@@ -170,6 +176,16 @@ impl Tensor {
     }
 }
 
+impl PartialEq for Tensor {
+    fn eq(&self, other: &Self) -> bool {
+        self.data == other.data && self.shape == other.shape && self.stride == other.stride
+    }
+
+    fn ne(&self, other: &Self) -> bool {
+        !self.eq(other)
+    }
+}
+
 impl Index<&[usize]> for Tensor {
     type Output = f32;
 
@@ -198,7 +214,7 @@ mod tests {
 
     #[test]
     fn test_arange() {
-        let t = Tensor::arange(0..6, &[2, 3]);
+        let t = Tensor::arange(&[2, 3], 0..6);
         assert_eq!(t.data, vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0]);
     }
 
@@ -225,6 +241,7 @@ mod tests {
         let stride2 = Tensor::shape_to_stride(&[2, 2, 3]);
         assert_eq!(stride2, vec![6, 3, 1]);
 
+        // 3D with flat shape
         let stride3 = Tensor::shape_to_stride(&[1, 3, 4]);
         assert_eq!(stride3, vec![0, 4, 1]);
     }
