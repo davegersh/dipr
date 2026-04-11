@@ -3,6 +3,7 @@ pub use dense::Dense;
 pub use dense::WeightInit;
 pub mod activation;
 pub mod attention;
+pub mod embedding;
 
 use crate::tensor::Tensor;
 

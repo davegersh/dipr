@@ -268,7 +268,7 @@ mod tests {
         assert_eq!(broadcast_shape, None);
     }
 
-    // Macro for overloading operators for element-wise ops (including scalar)
+    // Macro for automatic arithmetic ops tests
     macro_rules! arithmetic_op_test {
         ($op:tt, $tensor_test_name:ident, $scalar_test_name:ident, $broadcast_test_name:ident) => {
             #[test]

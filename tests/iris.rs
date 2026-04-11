@@ -46,7 +46,7 @@ fn load_data(path: &str) -> (Vec<f32>, Vec<String>) {
 #[test]
 fn test_iris_converge() {
     // load data
-    let (x_data, y_data) = load_data("tests/iris.data");
+    let (x_data, y_data) = load_data("tests/data/iris.data");
 
     let x = Tensor::new(x_data, vec![y_data.len(), 4]).min_max_scale(0);
 
