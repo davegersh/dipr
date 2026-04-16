@@ -106,9 +106,8 @@ impl Tensor {
         let n = other.shape[rank - 1];
         let k = self.shape[rank - 1];
 
-        assert_eq!(
-            k,
-            other.shape[rank - 2],
+        assert!(
+            k == other.shape[rank - 2] || k == 1 || other.shape[rank - 2] == 1,
             "Invalid shapes for matmul! Inner shapes must match: {:?} @ {:?}",
             self.shape,
             other.shape

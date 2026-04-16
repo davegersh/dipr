@@ -55,6 +55,18 @@ impl Model {
             }
         }
     }
+
+    pub fn calculate_total_params(&mut self) -> usize {
+        let mut total = 0;
+        for layer in self.layers.iter_mut() {
+            for (param, _) in layer.parameters_mut() {
+                let params: usize = param.shape.iter().product();
+                total += params;
+            }
+        }
+
+        total
+    }
 }
 
 impl Layer for Model {

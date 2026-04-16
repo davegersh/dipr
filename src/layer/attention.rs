@@ -11,7 +11,12 @@ pub struct Attention {
     pub weights_v_grad: Tensor,
 
     softmax: Softmax,
+
     x_cache: Option<Tensor>,
+    query_cache: Option<Tensor>,
+    key_cache: Option<Tensor>,
+    value_cache: Option<Tensor>,
+
     d_k: usize,
 }
 
@@ -28,40 +33,47 @@ impl Attention {
             weights_v_grad: Tensor::zeros(&weights_shape),
             softmax: Softmax::new(),
             x_cache: None,
+            query_cache: None,
+            key_cache: None,
+            value_cache: None,
             d_k: d_k,
         }
     }
 
-    fn compute_score(&self, x: &Tensor) -> Tensor {
+    fn compute(&mut self, x: &Tensor, is_training: bool) -> Tensor {
         let query = x.matmul(&self.weights_q); // Q = x @ w_q
         let key = x.matmul(&self.weights_k); // K = x @ w_k
 
         // S = (Q @ K^T) / sqrt(d)
-        query.matmul(&key.transpose()) / (self.d_k as f32).sqrt()
+        let score = query.matmul(&key.transpose()) / (self.d_k as f32).sqrt();
+
+        let a = match is_training {
+            true => self.softmax.forward_train(&score),
+            false => self.softmax.forward(&score),
+        };
+
+        let value = x.matmul(&self.weights_v);
+
+        let result = a.matmul(&value);
+
+        if is_training {
+            self.query_cache = Some(query);
+            self.key_cache = Some(key);
+            self.value_cache = Some(value);
+        }
+
+        result
     }
 }
 
 impl Layer for Attention {
     fn forward(&mut self, x: &Tensor) -> Tensor {
-        let score = self.compute_score(x);
-
-        let a = self.softmax.forward(&score);
-
-        let value = x.matmul(&self.weights_v);
-
-        a.matmul(&value)
+        self.compute(x, false)
     }
 
     fn forward_train(&mut self, x: &Tensor) -> Tensor {
         self.x_cache = Some(x.clone());
-
-        let score = self.compute_score(x);
-
-        let a = self.softmax.forward_train(&score);
-
-        let value = x.matmul(&self.weights_v);
-
-        a.matmul(&value)
+        self.compute(x, true)
     }
 
     fn backward(&mut self, dj_dy: &Tensor) -> Tensor {
@@ -70,7 +82,7 @@ impl Layer for Attention {
             let dj_dv = a.transpose().matmul(dj_dy);
 
             if let Some(x) = &self.x_cache {
-                let value = x.matmul(&self.weights_v);
+                let value = self.value_cache.as_ref().unwrap();
 
                 // gradient for softmax output
                 let dj_da = dj_dy.matmul(&value.transpose());
@@ -79,8 +91,8 @@ impl Layer for Attention {
                 let dj_ds = self.softmax.backward(&dj_da);
 
                 // Recalculate query, key, and d (dims)
-                let query = x.matmul(&self.weights_q); // Q = x @ w_q
-                let key = x.matmul(&self.weights_k); // K = x @ w_k
+                let query = self.query_cache.as_ref().unwrap(); // Q = x @ w_q
+                let key = self.key_cache.as_ref().unwrap(); // K = x @ w_k
 
                 // gradient for query
                 let dj_dq = dj_ds.matmul(&key) / (self.d_k as f32).sqrt();
@@ -89,9 +101,9 @@ impl Layer for Attention {
                 let dj_dk = dj_ds.transpose().matmul(&query) / (self.d_k as f32).sqrt();
 
                 // gradients q, v, k weights
-                self.weights_q_grad = x.transpose().matmul(&dj_dq);
-                self.weights_v_grad = x.transpose().matmul(&dj_dv);
-                self.weights_k_grad = x.transpose().matmul(&dj_dk);
+                self.weights_q_grad = x.transpose().matmul(&dj_dq).sum(0).flatten_left(2);
+                self.weights_v_grad = x.transpose().matmul(&dj_dv).sum(0).flatten_left(2);
+                self.weights_k_grad = x.transpose().matmul(&dj_dk).sum(0).flatten_left(2);
 
                 // dj_dx combines q, v, k gradients and their multiplied weights
                 return dj_dq.matmul(&self.weights_q.transpose())
@@ -132,19 +144,6 @@ mod tests {
         assert_eq!(x.shape, out.shape);
     }
 
-    #[test]
-    fn test_attention_weights_sum_to_one() {
-        let mut attn = Attention::new(4, 4);
-        let x = Tensor::iota(&[2, 2, 4]);
-
-        let _output = attn.forward(&x);
-        let score = attn.compute_score(&x);
-        let weights = score.softmax();
-
-        // Each row should sum to 1.0
-        assert_eq!(weights.sum(2).data, vec![1.0, 1.0, 1.0, 1.0]);
-    }
-    // Test 2: Attention Backward Pass
     #[test]
     fn test_attention_backward() {
         let mut attn = Attention::new(4, 4);

@@ -4,20 +4,22 @@ use std::io::{BufRead, BufReader};
 
 use dipr::layer::attention::Attention;
 use dipr::layer::embedding::Embedding;
+use dipr::layer::shapes::MeanPool;
 use dipr::loss::CategoricalCrossEntropy;
+use dipr::prep::OneHotEncoder;
 use dipr::rand::XorShift;
 use dipr::{
     Model, Tensor,
-    layer::{Dense, Layer, WeightInit, activation::ReLU},
+    layer::{Dense, Layer, WeightInit},
     optim::SGD,
 };
 
-pub fn read_data(path: &str) -> (Vec<String>, Vec<usize>) {
+pub fn read_data(path: &str) -> (Vec<String>, Vec<String>) {
     let file = File::open(path).expect("Sentiment data file not found!");
     let reader = BufReader::new(file);
 
     let mut sentences: Vec<String> = vec![];
-    let mut sentiments: Vec<usize> = vec![];
+    let mut sentiments: Vec<String> = vec![];
 
     for line in reader.lines() {
         let line = line.expect("Error reading line from sentiment data!");
@@ -27,7 +29,7 @@ pub fn read_data(path: &str) -> (Vec<String>, Vec<usize>) {
         let sentence = parts[0].to_lowercase();
 
         sentences.push(sentence);
-        sentiments.push(parts[1].parse::<usize>().unwrap())
+        sentiments.push(parts[1].to_owned());
     }
 
     (sentences, sentiments)
@@ -85,8 +87,6 @@ pub fn sentence_to_token_ids(sentences: &Vec<String>, vocab: &HashMap<String, us
         }
     }
 
-    println!("{:?}", seqs);
-
     let mut token_id_data: Vec<f32> = vec![];
     for seq in seqs {
         token_id_data.extend(seq.iter().map(|f| *f as f32));
@@ -98,36 +98,44 @@ pub fn sentence_to_token_ids(sentences: &Vec<String>, vocab: &HashMap<String, us
 
 #[test]
 fn test_sentiment_converge() {
-    let (sentences, sentiments) = read_data("tests/data/sentiment.data");
+    let (mut sentences, mut sentiments) = read_data("tests/data/sentiment.data");
 
     println!("Sentences: {:?}\n Sentiments: {:?}", sentences, sentiments);
 
     let vocab = extract_vocab(&sentences);
 
     println!("Vocab: {:?}", vocab);
+    // data shuffling
+    let mut x_rand = XorShift::new(42, false);
+    x_rand.shuffle(&mut sentences);
 
     let x = sentence_to_token_ids(&sentences, &vocab);
-
     println!("Token IDs: {:?}", x);
 
-    let y = Tensor::new(
-        sentiments.iter().map(|f| *f as f32).collect(),
-        vec![sentiments.len()],
-    );
+    let mut y_rand = XorShift::new(42, false);
+    y_rand.shuffle(&mut sentiments);
+
+    let sentiment_encoder = OneHotEncoder::new(vec!["positive".to_owned(), "negative".to_owned()]);
+
+    let y = sentiment_encoder.encode(&sentiments);
+
+    println!("{:?}", y);
 
     // create model
     let mut model = Model::new(
-        Box::new(SGD::new(1.2)),
+        Box::new(SGD::new(0.05)),
         Box::new(CategoricalCrossEntropy::new()),
     );
 
     model.add_layer(Embedding::new(vocab.len(), 16));
     model.add_layer(Attention::new(16, 16));
-    // ADD Mean Pool Layer! To turn attention rank 3 -> dense rank 2 input (mean pool second axis)
-    model.add_layer(Dense::new(16, 2, WeightInit::Uniform));
+    model.add_layer(MeanPool::new(1));
+    model.add_layer(Dense::new(16, 2, WeightInit::Xavier));
+
+    println!("Total Model Params: {:?}", model.calculate_total_params());
 
     // train it
-    let history = model.train(&x, &y, 10);
+    let history = model.train(&x, &y, 500);
     println!("\nCost History: {:?}\n", history);
 
     // check train convergence

@@ -4,6 +4,7 @@ pub use dense::WeightInit;
 pub mod activation;
 pub mod attention;
 pub mod embedding;
+pub mod shapes;
 
 use crate::tensor::Tensor;
 

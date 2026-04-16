@@ -12,7 +12,7 @@ pub struct Embedding {
 
 impl Embedding {
     pub fn new(vocab_size: usize, embed_dim: usize) -> Self {
-        let weights = Tensor::rand(&[vocab_size, embed_dim], 42);
+        let weights = Tensor::rand(&[vocab_size, embed_dim], 42) / (vocab_size * embed_dim) as f32;
         let weights_grad = Tensor::zeros(&[vocab_size, embed_dim]);
 
         Self {

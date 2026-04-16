@@ -16,6 +16,6 @@ impl SGD {
 
 impl Optimizer for SGD {
     fn update_parameter(&self, parameter: &mut Tensor, gradient: &Tensor) {
-        *parameter -= &(gradient * self.lr);
+        *parameter -= &gradient.map(|x| x.clamp(-1.0, 1.0) * self.lr);
     }
 }
